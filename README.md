@@ -1,7 +1,7 @@
 # 🎰 JOAckpot
 
-Une app mobile de casino entre potes, développée en React Native avec Expo.  
-Première version : Blackjack & Roulette dans un style arcade fun, pensé pour jouer à plusieurs sans argent réel.
+Une app mobile de casino, développée en React Native avec Expo.  
+Première version : Blackjack & Roulette sans argent réel.
 
 ---
 
@@ -14,7 +14,6 @@ Première version : Blackjack & Roulette dans un style arcade fun, pensé pour j
 - (Facultatif) Figma pour le design
 
 ### 2. Installation
-
 ```bash
 git clone https://github.com/NathanRouleau/joackpot.git
 cd joackpot
@@ -28,7 +27,8 @@ npx expo start
 - Scanne le QR code avec Expo Go sur ton téléphone.
 - Le jeu est en mode paysage uniquement.
 
-🗂️ Structure du projet
+\
+🗂️ Structure du projet 
 ```bash
 joackpot-app/
 │
@@ -57,6 +57,7 @@ joackpot-app/
 JOAckpot — clin d'œil au casino JOA où tout a commencé 🍀
 
  ### 🧠 Auteurs
-
 @Nathan — Dev fullstack & casino lover
 
+
+⚠️ Projet à but purement récréatif, __aucun argent réel__ n’est impliqué.
