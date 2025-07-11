@@ -3,7 +3,7 @@
     "name": "JOAckpot",
     "slug": "joackpot-app",
     "version": "1.0.0",
-    "orientation": "landscape",
+    "orientation": "portrait",
     "icon": "./assets/joackpot_logo_full.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
