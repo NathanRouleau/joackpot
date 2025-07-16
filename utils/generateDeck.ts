@@ -4,7 +4,7 @@ import cardImages from '../assets/cartes';
 
 export const generateDeck = (numberOfDecks: number = 6): Card[] => {
   const suits: Suit[]  = ['Pique', 'Trefle', 'Carreau', 'Coeur'];
-  const values: Value[] = ['As','2','3','4','5','6','7','8','9','10','Valet','Dame','Roi'];
+  const values: Value[] = ['As','Deux','Trois','Quatre','Cinq','Six','Sept','Huit','Neuf','Dix','Valet','Dame','Roi'];
 
   const deck: Card[] = [];
 

@@ -1,9 +1,10 @@
-// screens/BlackjackScreen.tsx
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Card as CardType } from '../types/Card';
 import Hand from '../components/Hand';
 import { generateDeck } from '../utils/generateDeck';
+import { points } from '../utils/valueMap';
+import { getHandTotals } from '../utils/handTotals';
 
 const INITIAL_CREDITS = 1000;
 
@@ -25,26 +26,9 @@ export default function BlackjackScreen() {
     return [card, newDeck];
   };
 
-  const handValue = (hand: CardType[]): number => {
-    let total = 0;
-    let aces = 0;
-
-    hand.forEach(card => {
-      if (card.value === 'As') {
-        aces += 1;
-        total += 11;
-      } else if (['Valet', 'Dame', 'Roi'].includes(card.value) || card.value === '10') {
-        total += 10;
-      } else {
-        total += Number(card.value);
-      }
-    });
-
-    while (total > 21 && aces > 0) {
-      total -= 10;
-      aces -= 1;
-    }
-    return total;
+  const bestValue = (hand: CardType[]) => {
+    const totals = getHandTotals(hand);
+    return totals[totals.length - 1];          // le plus grand ≤21 (ou min si bust)
   };
 
   /* ---------- GAME FLOW ---------- */
@@ -95,7 +79,7 @@ export default function BlackjackScreen() {
       let dHand = [...dealerHand];
       let dDeck = [...deck];
 
-      while (handValue(dHand) < 17) {
+      while (bestValue(dHand) < 17) {
         const [card, rest] = drawCard(dDeck);
         dHand.push(card);
         dDeck = rest;
@@ -106,12 +90,11 @@ export default function BlackjackScreen() {
     };
 
     dealerPlay();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playerTurn]);
 
   const resolveWinner = (finalDealerHand: CardType[]) => {
-    const playerScore = handValue(playerHand);
-    const dealerScore = handValue(finalDealerHand);
+    const playerScore = bestValue(playerHand);
+    const dealerScore = bestValue(finalDealerHand);
 
     let resultMsg = '';
     if (playerScore > 21) {
@@ -143,19 +126,19 @@ export default function BlackjackScreen() {
       {/* DEALER */}
       <Hand cards={dealerHand} hideFirst={gameStarted && playerTurn} />
       <Text style={styles.scoreText}>
-        { !gameStarted || !playerTurn ? handValue(dealerHand) : '' }
+        { !gameStarted || !playerTurn ? getHandTotals(dealerHand) : '' }
       </Text>
 
       {/* RÈGLES CENTER */}
       <Text style={styles.rules}>
-        Blackjack pays 3 pour 2{'\n'}
-        Le croupier reste sur 17 soft{'\n'}
-        Assurance paye 2 pour 1
+        Blackjack paie 3 pour 2{'\n'}
+        Le croupier tire à 16 et reste à 17{'\n'}
+        Assurance paie 2 pour 1
       </Text>
 
       {/* PLAYER */}
       <Hand cards={playerHand} />
-      <Text style={styles.scoreText}>{handValue(playerHand)}</Text>
+      <Text style={styles.scoreText}>{getHandTotals(playerHand)}</Text>
 
       {/* BET & CONTROLS */}
       <Text style={styles.betText}>Mise : {bet} €</Text>
@@ -193,7 +176,6 @@ export default function BlackjackScreen() {
 }
 
 /* ---------- PETITS COMPOS INTERNES ---------- */
-
 const ActionButton = ({ label, color, onPress, disabled }: any) => (
   <TouchableOpacity
     style={[styles.actionBtn, { backgroundColor: color, opacity: disabled ? 0.4 : 1 }]}
