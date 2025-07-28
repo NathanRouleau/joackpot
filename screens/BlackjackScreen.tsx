@@ -5,6 +5,7 @@ import Hand from '../components/Hand';
 import { generateDeck } from '../utils/generateDeck';
 import { points } from '../utils/valueMap';
 import { getHandTotals } from '../utils/handTotals';
+import Chip from '../components/Chip';
 
 const INITIAL_CREDITS = 1000;
 
@@ -156,9 +157,9 @@ export default function BlackjackScreen() {
       ) : (
         <>
           <View style={styles.chipsRow}>
-            <Chip value={10} bet={bet} setBet={setBet} credits={credits} />
-            <Chip value={50} bet={bet} setBet={setBet} credits={credits} />
-            <Chip value={100} bet={bet} setBet={setBet} credits={credits} />
+            {[1, 5, 10, 50, 100, 500].map(v => (
+              <Chip key={v} value={v} bet={bet} setBet={setBet} credits={credits} />
+            ))}
           </View>
           <TouchableOpacity style={styles.startBtn} onPress={initGame}>
             <Text style={styles.startBtnText}>Commencer la partie</Text>
@@ -185,19 +186,6 @@ const ActionButton = ({ label, color, onPress, disabled }: any) => (
   </TouchableOpacity>
 );
 
-const Chip = ({ value, bet, setBet, credits }: any) => {
-  const disabled = credits < value;
-  return (
-    <TouchableOpacity
-      onPress={() => !disabled && setBet(bet + value)}
-      style={{ opacity: disabled ? 0.3 : 1 }}
-    >
-      <Image source={require('../assets/jetons/blue.png')} style={styles.chipImg} />
-      <Text style={styles.chipLabel}>+{value}</Text>
-    </TouchableOpacity>
-  );
-};
-
 /* ---------- STYLES ---------- */
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#7A0000', paddingTop: 30, alignItems: 'center' },
@@ -214,15 +202,13 @@ const styles = StyleSheet.create({
   actionBtn: { paddingVertical: 10, paddingHorizontal: 12, borderRadius: 6, marginHorizontal: 3 },
   actionBtnText: { color: '#111', fontWeight: '700' },
 
-  chipsRow: { flexDirection: 'row', marginVertical: 15 },
-  chipImg: { width: 40, height: 40 },
-  chipLabel: { color: 'white', textAlign: 'center', fontSize: 12, marginTop: -8 },
+  chipsRow: { flexDirection: 'row', marginVertical: 15, justifyContent: 'center' },
 
   startBtn: { backgroundColor: '#DDD', paddingVertical: 10, paddingHorizontal: 20, borderRadius: 4 },
   startBtnText: { color: '#111', fontWeight: '600' },
 
   info: { color: '#FFD700', marginTop: 10 },
 
-  creditsBar: { position: 'absolute', bottom: 0, width: '100%', backgroundColor: '#865C2D', padding: 10 },
-  creditsText: { color: 'white', textAlign: 'center', fontWeight: '700' },
+  creditsBar: { position: 'absolute', bottom: 0, width: '100%', backgroundColor: '#865C2D', padding: 20 },
+  creditsText: { color: 'white', textAlign: 'center', fontSize: 32, fontWeight: '700' },
 });
