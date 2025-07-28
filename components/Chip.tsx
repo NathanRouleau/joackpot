@@ -4,18 +4,17 @@ import { chipImages } from '../utils/chipImages';
 
 type Props = {
   value: number;
-  bet: number;
-  setBet: (n: number) => void;
   credits: number;
+  addBet: (n: number) => void;
 };
 
-export default function Chip({ value, bet, setBet, credits }: Props) {
+export default function Chip({ value, credits, addBet }: Props) {
   const disabled = credits < value;
   const source = chipImages[value];
 
   return (
     <TouchableOpacity
-      onPress={() => !disabled && setBet(bet + value)}
+      onPress={() => addBet(value)}
       style={[styles.wrapper, disabled && { opacity: 0.3 }]}
       disabled={disabled}
     >

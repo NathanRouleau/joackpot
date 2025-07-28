@@ -32,6 +32,13 @@ export default function BlackjackScreen() {
     return totals[totals.length - 1];
   };
 
+  const formatTotals = (hand: CardType[]) => {
+    const totals = getHandTotals(hand);
+    return totals.length > 1
+      ? `${totals[0]} / ${totals[1]}`
+      : `${totals[0]}`;
+  }
+
   /* ---------- GAME FLOW ---------- */
   const initGame = () => {
     if (bet === 0) {
@@ -123,6 +130,13 @@ export default function BlackjackScreen() {
     setBet(0);
   };
 
+  const addBet = (amount: number) => {
+    if(!gameStarted && credits >= amount) {
+      setBet(b => b + amount);
+      setCredits(c => c - amount);
+    }
+  }
+
   /* ---------- RENDER ---------- */
   return (
     <View style={styles.container}>
@@ -135,7 +149,7 @@ export default function BlackjackScreen() {
       {/* DEALER */}
       <Hand cards={dealerHand} hideFirst={gameStarted && playerTurn} />
       <Text style={styles.scoreText}>
-        { !gameStarted || !playerTurn ? getHandTotals(dealerHand) : '' }
+        { !gameStarted || !playerTurn ? formatTotals(dealerHand) : '' }
       </Text>
 
       {/* RÈGLES CENTER */}
@@ -147,7 +161,7 @@ export default function BlackjackScreen() {
 
       {/* PLAYER */}
       <Hand cards={playerHand} />
-      <Text style={styles.scoreText}>{getHandTotals(playerHand)}</Text>
+      <Text style={styles.scoreText}>{formatTotals(playerHand)}</Text>
 
       {/* BET & CONTROLS */}
       <Text style={styles.betText}>Mise : {bet} €</Text>
@@ -166,7 +180,7 @@ export default function BlackjackScreen() {
         <>
           <View style={styles.chipsRow}>
             {[1, 5, 10, 50, 100, 500].map(v => (
-              <Chip key={v} value={v} bet={bet} setBet={setBet} credits={credits} />
+              <Chip key={v} value={v} credits={credits} addBet={addBet} />
             ))}
           </View>
           <TouchableOpacity style={styles.startBtn} onPress={initGame}>
