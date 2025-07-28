@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Modal } from 'react-native';
 import { Card as CardType } from '../types/Card';
 import Hand from '../components/Hand';
 import { generateDeck } from '../utils/generateDeck';
@@ -19,6 +19,13 @@ export default function BlackjackScreen() {
   const [gameStarted, setGameStarted] = useState<boolean>(false);
   const [playerTurn, setPlayerTurn] = useState<boolean>(true);
   const [message, setMessage] = useState<string>('Commencer la partie');
+  const [insuranceOffered, setInsuranceOffered] = useState<boolean>(false);
+  const [insuranceBet, setInsuranceBet] = useState<number>(0);
+
+  /* ---------- CONSTANTS ---------- */
+  const canSplit = gameStarted && playerTurn && playerHand.length === 2 && playerHand[0].value === playerHand[1].value;
+  const isBlackjack = (hand: CardType[]) => hand.length === 2 && bestValue(hand) === 21;
+  const dealerShowsTenOrAce = (dealerUp: CardType) => dealerUp.value === 'As' || ['Dix', 'Valet', 'Dame', 'Roi'].includes(dealerUp.value);
 
   /* ---------- HELPERS ---------- */
   const drawCard = (currentDeck: CardType[]): [CardType, CardType[]] => {
@@ -45,19 +52,39 @@ export default function BlackjackScreen() {
       setMessage('Place une mise avant !');
       return;
     }
+
     let newDeck = generateDeck();        // 6 decks par défaut
-    const [p1, d1, p2, d2] = [0, 0, 0, 0].map(() => {
+    const [p1, d1, p2] = [...Array(3)].map(() => {
       const [card, rest] = drawCard(newDeck);
       newDeck = rest;
       return card;
     });
 
-    setPlayerHand([p1, p2]);
-    setDealerHand([d1, d2]);
+    const initialPlayerHand = [p1, p2];
+    const initialDealerHand = [d1];
+
+    setPlayerHand(initialPlayerHand);
+    setDealerHand(initialDealerHand);
     setDeck(newDeck);
-    setGameStarted(true);
-    setPlayerTurn(true);
-    setMessage('');
+    
+    const playerBJ = isBlackjack([p1, p2]);
+    const dealerUpTenOrAce = dealerShowsTenOrAce(d1);
+
+    if (playerBJ && !dealerUpTenOrAce) {
+      // Le joueur a un Blackjack & le croupier n'a ni As ni 10
+      setCredits(c => c + bet * 2.5);
+      setBet(0);
+      setGameStarted(false);
+      setPlayerTurn(false);
+      setMessage('Blackjack ! Paiement 3 pour 2.');
+    } else {
+      // Partie normale
+      setGameStarted(true);
+      setPlayerTurn(!playerBJ);
+      setMessage('');
+      // Assurance si le croupier montre un As
+      if (dealerUpTenOrAce) setInsuranceOffered(true);
+    }
   };
 
   const hit = () => {
@@ -87,6 +114,19 @@ export default function BlackjackScreen() {
     setPlayerTurn(false);
   };
 
+  const takeInsurance = () => {
+    const maxIns = bet / 2;
+    if (credits >= maxIns) {
+      setCredits(c => c - maxIns);
+      setInsuranceBet(maxIns);
+    }
+    setInsuranceOffered(false);
+  }
+  
+  const declineInsurance = () => {
+    setInsuranceOffered(false);
+  };
+
   /* ---------- DEALER LOGIC ---------- */
   useEffect(() => {
     if (!gameStarted || playerTurn) return;
@@ -94,6 +134,12 @@ export default function BlackjackScreen() {
     const dealerPlay = () => {
       let dHand = [...dealerHand];
       let dDeck = [...deck];
+
+      if (dHand.length === 1) {
+        const [second, rest] = drawCard(dDeck);
+        dHand.push(second);
+        dDeck = rest;
+      }
 
       while (bestValue(dHand) < 17) {
         const [card, rest] = drawCard(dDeck);
@@ -112,8 +158,24 @@ export default function BlackjackScreen() {
     const playerScore = bestValue(playerHand);
     const dealerScore = bestValue(finalDealerHand);
 
+    const playerBJ  = isBlackjack(playerHand);
+    const dealerBJ  = isBlackjack(finalDealerHand);
+
     let resultMsg = '';
-    if (playerScore > 21) {
+
+    /* ----- CAS BLACKJACKS ----- */
+    if (playerBJ && dealerBJ) {
+      resultMsg = 'Égalité !';
+      setCredits(c => c + bet);
+    } else if (playerBJ) {
+      resultMsg = 'Blackjack ! Paiement 3 : 2.';
+      setCredits(c => c + bet * 2.5);
+    } else if (dealerBJ) {
+      resultMsg = 'Le croupier a Blackjack. Tu perds ta mise.';
+    }
+
+    /* ----- CAS CLASSIQUES ----- */
+    else if (playerScore > 21) {
       resultMsg = 'Bust ! Le croupier gagne.';
     } else if (dealerScore > 21 || playerScore > dealerScore) {
       resultMsg = 'Tu gagnes !';
@@ -125,10 +187,24 @@ export default function BlackjackScreen() {
       resultMsg = 'Le croupier gagne.';
     }
 
+    /* ===== PAIEMENT / PERTE ASSURANCE ===== */
+    if (insuranceBet > 0) {
+      if (dealerBJ) {
+        // on rend insuranceBet + 2× gain  → total ×3
+        setCredits(c => c + insuranceBet * 3);
+        resultMsg += '\nAssurance payée 2:1.';
+      } else {
+        resultMsg += '\nAssurance perdue.';
+      }
+      setInsuranceBet(0);
+    }
+
+    /* ----- FIN DE MANCHE ----- */
     setMessage(resultMsg);
     setGameStarted(false);
     setBet(0);
   };
+
 
   const addBet = (amount: number) => {
     if(!gameStarted && credits >= amount) {
@@ -139,62 +215,95 @@ export default function BlackjackScreen() {
 
   /* ---------- RENDER ---------- */
   return (
-    <View style={styles.container}>
-      {/* HEADER */}
-      <View style={styles.header}>
-        <Text style={styles.menuText}>Menu</Text>
-        <Image source={require('../assets/cartes/back.png')} style={styles.deckIcon} />
-      </View>
-
-      {/* DEALER */}
-      <Hand cards={dealerHand} hideFirst={gameStarted && playerTurn} />
-      <Text style={styles.scoreText}>
-        { !gameStarted || !playerTurn ? formatTotals(dealerHand) : '' }
-      </Text>
-
-      {/* RÈGLES CENTER */}
-      <Text style={styles.rules}>
-        Blackjack paie 3 pour 2{'\n'}
-        Le croupier tire à 16 et reste à 17{'\n'}
-        Assurance paie 2 pour 1
-      </Text>
-
-      {/* PLAYER */}
-      <Hand cards={playerHand} />
-      <Text style={styles.scoreText}>{formatTotals(playerHand)}</Text>
-
-      {/* BET & CONTROLS */}
-      <Text style={styles.betText}>Mise : {bet} €</Text>
-
-      {gameStarted ? (
-        <>
-          <View style={styles.buttonsRow}>
-            <ActionButton label="Hit" color="#D7263D" onPress={hit} disabled={!playerTurn}/>
-            <ActionButton label="Stay" color="#1FA774" onPress={stand} />
-            <ActionButton label="Double" color="#46B3E6" onPress={doubleDown} />
-            <ActionButton label="Split" color="#F2C94C" disabled />
+    <>
+      {/* MODAL ASSURANCE */}
+      <Modal
+        visible={insuranceOffered}
+        transparent
+        animationType="fade"
+      >
+        <View style={styles.backdrop}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>Assurance ?</Text>
+            <Text style={styles.modalText}>
+              Le croupier montre un As/10.{'\n'}
+              Tu peux assurer pour {bet / 2} € (paye 2:1).
+            </Text>
+            <View style={styles.modalBtns}>
+              <TouchableOpacity style={styles.yesBtn} onPress={takeInsurance}>
+                <Text style={styles.btnTxt}>Assurer</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.noBtn} onPress={declineInsurance}>
+                <Text style={styles.btnTxt}>Non merci</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-          <Text style={styles.info}>{message}</Text>
-        </>
-      ) : (
-        <>
-          <View style={styles.chipsRow}>
-            {[1, 5, 10, 50, 100, 500].map(v => (
-              <Chip key={v} value={v} credits={credits} addBet={addBet} />
-            ))}
-          </View>
-          <TouchableOpacity style={styles.startBtn} onPress={initGame}>
-            <Text style={styles.startBtnText}>Commencer la partie</Text>
-          </TouchableOpacity>
-          <Text style={styles.info}>{message}</Text>
-        </>
-      )}
+        </View>
+      </Modal>
 
-      {/* FOOTER (CREDITS) */}
-      <View style={styles.creditsBar}>
-        <Text style={styles.creditsText}>{credits} €</Text>
+      <View style={styles.container}>
+        {/* HEADER */}
+        <View style={styles.header}>
+          <Text style={styles.menuText}>Menu</Text>
+          <Image source={require('../assets/cartes/back.png')} style={styles.deckIcon} />
+        </View>
+
+        {/* DEALER */}
+        <Hand cards={dealerHand} />
+        <Text style={styles.scoreText}>
+          { !gameStarted || !playerTurn ? formatTotals(dealerHand) : '' }
+        </Text>
+
+        {/* RÈGLES CENTER */}
+        <Text style={styles.rules}>
+          Blackjack paie 3 pour 2{'\n'}
+          Le croupier tire à 16 et reste à 17{'\n'}
+          Assurance paie 2 pour 1
+        </Text>
+
+        {/* PLAYER */}
+        <Hand cards={playerHand} />
+        <Text style={styles.scoreText}>{formatTotals(playerHand)}</Text>
+
+        {/* BET & CONTROLS */}
+        <Text style={styles.betText}>Mise : {bet} €</Text>
+        
+        {insuranceBet > 0 && (
+          <Text style={styles.insuranceText}>
+            Assurance : {insuranceBet} €
+          </Text>
+        )}
+
+        {gameStarted ? (
+          <>
+            <View style={styles.buttonsRow}>
+              <ActionButton label="Hit"    color="#D7263D" onPress={hit}        disabled={!playerTurn} />
+              <ActionButton label="Stay"   color="#1FA774" onPress={stand}      disabled={!playerTurn} />
+              <ActionButton label="Double" color="#46B3E6" onPress={doubleDown} disabled={!playerTurn} />
+              <ActionButton label="Split"  color="#F2C94C" /*onPress={}*/       disabled={!canSplit || !playerTurn} />
+            </View>
+            <Text style={styles.info}>{message}</Text>
+          </>
+        ) : (
+          <>
+            <View style={styles.chipsRow}>
+              {[1, 5, 10, 50, 100, 500].map(v => (
+                <Chip key={v} value={v} credits={credits} addBet={addBet} />
+              ))}
+            </View>
+            <TouchableOpacity style={styles.startBtn} onPress={initGame}>
+              <Text style={styles.startBtnText}>Commencer la partie</Text>
+            </TouchableOpacity>
+            <Text style={styles.info}>{message}</Text>
+          </>
+        )}
+
+        {/* FOOTER (CREDITS) */}
+        <View style={styles.creditsBar}>
+          <Text style={styles.creditsText}>{credits} €</Text>
+        </View>
       </View>
-    </View>
+    </>
   );
 }
 
@@ -219,6 +328,7 @@ const styles = StyleSheet.create({
   rules: { color: '#EEE', fontSize: 12, textAlign: 'center', marginVertical: 5 },
 
   betText: { color: '#EEE', marginVertical: 10 },
+  insuranceText: { color: '#6EC6FF', marginBottom: 4 },
 
   buttonsRow: { flexDirection: 'row', justifyContent: 'space-around', width: '100%' },
   actionBtn: { paddingVertical: 10, paddingHorizontal: 12, borderRadius: 6, marginHorizontal: 3 },
@@ -233,4 +343,24 @@ const styles = StyleSheet.create({
 
   creditsBar: { position: 'absolute', bottom: 0, width: '100%', backgroundColor: '#865C2D', padding: 20 },
   creditsText: { color: 'white', textAlign: 'center', fontSize: 32, fontWeight: '700' },
+
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalBox: {
+    width: '80%',
+    backgroundColor: '#222',
+    borderRadius: 8,
+    padding: 20,
+    alignItems: 'center',
+  },
+  modalTitle: { color: '#FFD700', fontSize: 20, marginBottom: 8 },
+  modalText: { color: '#EEE', textAlign: 'center', marginBottom: 15 },
+  modalBtns: { flexDirection: 'row' },
+  yesBtn: { backgroundColor: '#1FA774', padding: 10, borderRadius: 6, marginHorizontal: 5 },
+  noBtn:  { backgroundColor: '#D7263D', padding: 10, borderRadius: 6, marginHorizontal: 5 },
+  btnTxt: { color: '#fff', fontWeight: '600' },
 });
