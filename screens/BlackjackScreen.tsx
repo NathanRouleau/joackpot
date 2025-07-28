@@ -29,7 +29,7 @@ export default function BlackjackScreen() {
 
   const bestValue = (hand: CardType[]) => {
     const totals = getHandTotals(hand);
-    return totals[totals.length - 1];          // le plus grand ≤21 (ou min si bust)
+    return totals[totals.length - 1];
   };
 
   /* ---------- GAME FLOW ---------- */
@@ -56,7 +56,15 @@ export default function BlackjackScreen() {
   const hit = () => {
     if (!playerTurn) return;
     const [card, newDeck] = drawCard(deck);
-    setPlayerHand(prev => [...prev, card]);
+    setPlayerHand(prevHand => {
+      const updatedHand = [...prevHand, card];
+      const total = bestValue(updatedHand);
+      if (total >= 21) {
+        setPlayerTurn(false);
+      }
+      return updatedHand;
+    });
+
     setDeck(newDeck);
   };
 
@@ -147,7 +155,7 @@ export default function BlackjackScreen() {
       {gameStarted ? (
         <>
           <View style={styles.buttonsRow}>
-            <ActionButton label="Hit" color="#D7263D" onPress={hit} />
+            <ActionButton label="Hit" color="#D7263D" onPress={hit} disabled={!playerTurn}/>
             <ActionButton label="Stay" color="#1FA774" onPress={stand} />
             <ActionButton label="Double" color="#46B3E6" onPress={doubleDown} />
             <ActionButton label="Split" color="#F2C94C" disabled />
