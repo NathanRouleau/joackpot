@@ -3,9 +3,9 @@ import { View, Text, StyleSheet, TouchableOpacity, Image, Modal } from 'react-na
 import { Card as CardType } from '../types/Card';
 import Hand from '../components/Hand';
 import { generateDeck } from '../utils/generateDeck';
-import { points } from '../utils/valueMap';
 import { getHandTotals } from '../utils/handTotals';
 import Chip from '../components/Chip';
+import { useNavigation } from '@react-navigation/native';
 
 const INITIAL_CREDITS = 1000;
 
@@ -25,7 +25,7 @@ export default function BlackjackScreen() {
   /* ---------- CONSTANTS ---------- */
   const canSplit = gameStarted && playerTurn && playerHand.length === 2 && playerHand[0].value === playerHand[1].value;
   const isBlackjack = (hand: CardType[]) => hand.length === 2 && bestValue(hand) === 21;
-  const dealerShowsTenOrAce = (dealerUp: CardType) => dealerUp.value === 'As' || ['Dix', 'Valet', 'Dame', 'Roi'].includes(dealerUp.value);
+  const dealerShowsAce = (dealerUp: CardType) => dealerUp.value === 'As';
 
   /* ---------- HELPERS ---------- */
   const drawCard = (currentDeck: CardType[]): [CardType, CardType[]] => {
@@ -33,6 +33,9 @@ export default function BlackjackScreen() {
     const card = newDeck.shift() as CardType;
     return [card, newDeck];
   };
+
+  /* ---------- HELPERS ---------- */
+  const navigation = useNavigation();
 
   const bestValue = (hand: CardType[]) => {
     const totals = getHandTotals(hand);
@@ -68,9 +71,9 @@ export default function BlackjackScreen() {
     setDeck(newDeck);
     
     const playerBJ = isBlackjack([p1, p2]);
-    const dealerUpTenOrAce = dealerShowsTenOrAce(d1);
+    const dealerUpIsAce = dealerShowsAce(d1);
 
-    if (playerBJ && !dealerUpTenOrAce) {
+    if (playerBJ && !dealerUpIsAce) {
       // Le joueur a un Blackjack & le croupier n'a ni As ni 10
       setCredits(c => c + bet * 2.5);
       setBet(0);
@@ -83,7 +86,7 @@ export default function BlackjackScreen() {
       setPlayerTurn(!playerBJ);
       setMessage('');
       // Assurance si le croupier montre un As
-      if (dealerUpTenOrAce) setInsuranceOffered(true);
+      if (dealerUpIsAce) setInsuranceOffered(true);
     }
   };
 
@@ -244,7 +247,9 @@ export default function BlackjackScreen() {
       <View style={styles.container}>
         {/* HEADER */}
         <View style={styles.header}>
-          <Text style={styles.menuText}>Menu</Text>
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Text style={styles.menuText}>← Menu</Text>
+          </TouchableOpacity>
           <Image source={require('../assets/cartes/back.png')} style={styles.deckIcon} />
         </View>
 
@@ -277,9 +282,9 @@ export default function BlackjackScreen() {
         {gameStarted ? (
           <>
             <View style={styles.buttonsRow}>
-              <ActionButton label="Hit"    color="#D7263D" onPress={hit}        disabled={!playerTurn} />
-              <ActionButton label="Stay"   color="#1FA774" onPress={stand}      disabled={!playerTurn} />
-              <ActionButton label="Double" color="#46B3E6" onPress={doubleDown} disabled={!playerTurn} />
+              <ActionButton label="Tirer"    color="#D7263D" onPress={hit}        disabled={!playerTurn} />
+              <ActionButton label="Rester"   color="#1FA774" onPress={stand}      disabled={!playerTurn} />
+              <ActionButton label="Doubler" color="#46B3E6" onPress={doubleDown} disabled={!playerTurn} />
               <ActionButton label="Split"  color="#F2C94C" /*onPress={}*/       disabled={!canSplit || !playerTurn} />
             </View>
             <Text style={styles.info}>{message}</Text>
@@ -321,7 +326,7 @@ const ActionButton = ({ label, color, onPress, disabled }: any) => (
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#7A0000', paddingTop: 30, alignItems: 'center' },
   header: { width: '100%', flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20 },
-  menuText: { color: 'white', fontSize: 22, fontFamily: 'Cinzel' },
+  menuText: { color: 'white', fontSize: 22, fontFamily: 'Cinzel', paddingTop:20 },
   deckIcon: { width: 60, height: 80, transform: [{ rotate: '20deg' }] },
 
   scoreText: { color: 'white', fontSize: 18, marginVertical: 5 },
