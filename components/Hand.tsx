@@ -1,17 +1,22 @@
+// components/Hand.tsx
 import { View, StyleSheet } from 'react-native';
-import Card from './Card';
+import FlipCard from './FlipCard';
 import { Card as CardType } from '../types/Card';
 
 type Props = {
   cards: CardType[];
-  hideFirst?: boolean;
+  flipped: boolean[];
 };
 
-export default function Hand({ cards, hideFirst = false }: Props) {
+export default function Hand({ cards, flipped }: Props) {
   return (
     <View style={styles.container}>
-      {cards.map((card, index) => (
-        <Card key={index} card={card} hidden={hideFirst && index === 0} />
+      {cards.map((card, idx) => (
+        <FlipCard
+          key={idx}
+          card={card}
+          hidden={flipped[idx]}   // dos si false, face si true
+        />
       ))}
     </View>
   );

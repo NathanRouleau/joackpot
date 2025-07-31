@@ -21,6 +21,8 @@ export default function BlackjackScreen() {
   const [message, setMessage] = useState<string>('Commencer la partie');
   const [insuranceOffered, setInsuranceOffered] = useState<boolean>(false);
   const [insuranceBet, setInsuranceBet] = useState<number>(0);
+  const [playerFlipped, setPlayerFlipped] = useState<boolean[]>([false, false]);
+  const [dealerFlipped, setDealerFlipped] = useState<boolean[]>([false]);
 
   /* ---------- CONSTANTS ---------- */
   const canSplit = gameStarted && playerTurn && playerHand.length === 2 && playerHand[0].value === playerHand[1].value;
@@ -66,9 +68,26 @@ export default function BlackjackScreen() {
     const initialPlayerHand = [p1, p2];
     const initialDealerHand = [d1];
 
+    // On met d'abord à jour les mains ET les flips (tout au dos)
     setPlayerHand(initialPlayerHand);
     setDealerHand(initialDealerHand);
     setDeck(newDeck);
+
+    setPlayerFlipped([false, false]);
+    setDealerFlipped([false]);
+
+    // Animation du flip décalé
+    setTimeout(() => {
+      setPlayerFlipped([true, false]);
+    }, 500);
+
+    setTimeout(() => {
+      setDealerFlipped([true]);
+    }, 1000);
+
+    setTimeout(() => {
+      setPlayerFlipped([true, true]);
+    }, 1500);
     
     const playerBJ = isBlackjack([p1, p2]);
     const dealerUpIsAce = dealerShowsAce(d1);
@@ -86,24 +105,39 @@ export default function BlackjackScreen() {
       setPlayerTurn(!playerBJ);
       setMessage('');
       // Assurance si le croupier montre un As
-      if (dealerUpIsAce) setInsuranceOffered(true);
+      if (dealerUpIsAce) {
+        setTimeout(() => setInsuranceOffered(true), 2000);};
     }
   };
 
-  const hit = () => {
-    if (!playerTurn) return;
-    const [card, newDeck] = drawCard(deck);
-    setPlayerHand(prevHand => {
-      const updatedHand = [...prevHand, card];
+const hit = () => {
+  if (!playerTurn) return;
+  const [card, newDeck] = drawCard(deck);
+
+  setPlayerHand(prevHand => {
+    const updatedHand = [...prevHand, card];
+
+    setPlayerFlipped(prev => [...prev, false]);
+    setTimeout(() => {
+      setPlayerFlipped(prev => {
+        const next = [...prev];
+        next[next.length - 1] = true;
+        return next;
+      });
+
       const total = bestValue(updatedHand);
       if (total >= 21) {
-        setPlayerTurn(false);
+        setTimeout(() => {
+          setPlayerTurn(false);
+        }, 1000); 
       }
-      return updatedHand;
-    });
+    }, 500);
 
-    setDeck(newDeck);
-  };
+    return updatedHand;
+  });
+
+  setDeck(newDeck);
+};
 
   const stand = () => {
     setPlayerTurn(false);
@@ -114,7 +148,9 @@ export default function BlackjackScreen() {
     setCredits(c => c - bet);
     setBet(b => b * 2);
     hit();
-    setPlayerTurn(false);
+    setTimeout(() => {
+      setPlayerTurn(false);
+    }, 1000); 
   };
 
   const takeInsurance = () => {
@@ -134,22 +170,41 @@ export default function BlackjackScreen() {
   useEffect(() => {
     if (!gameStarted || playerTurn) return;
 
-    const dealerPlay = () => {
+    const dealerPlay = async () => {
       let dHand = [...dealerHand];
       let dDeck = [...deck];
+      let dFlipped = [...dealerFlipped];
 
+      // Ajoute la deuxième carte (si nécessaire) avec animation
       if (dHand.length === 1) {
         const [second, rest] = drawCard(dDeck);
         dHand.push(second);
         dDeck = rest;
+        dFlipped.push(false);
+        setDealerHand([...dHand]);
+        setDealerFlipped([...dFlipped]);
+        await new Promise(r => setTimeout(r, 500));
+        dFlipped[dFlipped.length - 1] = true;
+        setDealerFlipped([...dFlipped]);
+        await new Promise(r => setTimeout(r, 500));
       }
 
+      // Puis pour chaque carte tirée tant que le croupier doit piocher
       while (bestValue(dHand) < 17) {
         const [card, rest] = drawCard(dDeck);
         dHand.push(card);
         dDeck = rest;
+        dFlipped.push(false);
+        setDealerHand([...dHand]);
+        setDealerFlipped([...dFlipped]);
+        await new Promise(r => setTimeout(r, 500));
+        dFlipped[dFlipped.length - 1] = true;
+        setDealerFlipped([...dFlipped]);
+        await new Promise(r => setTimeout(r, 500));
       }
+
       setDealerHand(dHand);
+      setDealerFlipped([...dFlipped]);
       setDeck(dDeck);
       resolveWinner(dHand);
     };
@@ -256,7 +311,7 @@ export default function BlackjackScreen() {
         {/* DEALER */}
         <View style={styles.gameArea}>
 
-          <Hand cards={dealerHand} />
+          <Hand cards={dealerHand} flipped={dealerFlipped}/>
           <Text style={styles.scoreText}>
             { !gameStarted || !playerTurn ? formatTotals(dealerHand) : '' }
           </Text>
@@ -269,7 +324,7 @@ export default function BlackjackScreen() {
           </Text>
 
           {/* PLAYER */}
-          <Hand cards={playerHand} />
+          <Hand cards={playerHand} flipped={playerFlipped} />
           <Text style={styles.scoreText}>{formatTotals(playerHand)}</Text>
 
           {/* BET & CONTROLS */}
