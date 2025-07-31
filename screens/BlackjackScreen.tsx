@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Modal, ImageBackground } from 'react-native';
 import { Card as CardType } from '../types/Card';
 import Hand from '../components/Hand';
 import { generateDeck } from '../utils/generateDeck';
@@ -254,58 +254,66 @@ export default function BlackjackScreen() {
         </View>
 
         {/* DEALER */}
-        <Hand cards={dealerHand} />
-        <Text style={styles.scoreText}>
-          { !gameStarted || !playerTurn ? formatTotals(dealerHand) : '' }
-        </Text>
+        <View style={styles.gameArea}>
 
-        {/* RÈGLES CENTER */}
-        <Text style={styles.rules}>
-          Blackjack paie 3 pour 2{'\n'}
-          Le croupier tire à 16 et reste à 17{'\n'}
-          Assurance paie 2 pour 1
-        </Text>
-
-        {/* PLAYER */}
-        <Hand cards={playerHand} />
-        <Text style={styles.scoreText}>{formatTotals(playerHand)}</Text>
-
-        {/* BET & CONTROLS */}
-        <Text style={styles.betText}>Mise : {bet} €</Text>
-        
-        {insuranceBet > 0 && (
-          <Text style={styles.insuranceText}>
-            Assurance : {insuranceBet} €
+          <Hand cards={dealerHand} />
+          <Text style={styles.scoreText}>
+            { !gameStarted || !playerTurn ? formatTotals(dealerHand) : '' }
           </Text>
-        )}
 
-        {gameStarted ? (
-          <>
-            <View style={styles.buttonsRow}>
-              <ActionButton label="Tirer"    color="#D7263D" onPress={hit}        disabled={!playerTurn} />
-              <ActionButton label="Rester"   color="#1FA774" onPress={stand}      disabled={!playerTurn} />
-              <ActionButton label="Doubler" color="#46B3E6" onPress={doubleDown} disabled={!playerTurn} />
-              <ActionButton label="Split"  color="#F2C94C" /*onPress={}*/       disabled={!canSplit || !playerTurn} />
-            </View>
-            <Text style={styles.info}>{message}</Text>
-          </>
-        ) : (
-          <>
-            <View style={styles.chipsRow}>
-              {[1, 5, 10, 50, 100, 500].map(v => (
-                <Chip key={v} value={v} credits={credits} addBet={addBet} />
-              ))}
-            </View>
-            <TouchableOpacity style={styles.startBtn} onPress={initGame}>
-              <Text style={styles.startBtnText}>Commencer la partie</Text>
-            </TouchableOpacity>
-            <Text style={styles.info}>{message}</Text>
-          </>
-        )}
+          {/* RÈGLES CENTER */}
+          <Text style={styles.rules}>
+            Blackjack paie 3 pour 2{'\n'}
+            Le croupier tire à 16 et reste à 17{'\n'}
+            Assurance paie 2 pour 1
+          </Text>
 
-        {/* FOOTER (CREDITS) */}
-        <View style={styles.creditsBar}>
-          <Text style={styles.creditsText}>{credits} €</Text>
+          {/* PLAYER */}
+          <Hand cards={playerHand} />
+          <Text style={styles.scoreText}>{formatTotals(playerHand)}</Text>
+
+          {/* BET & CONTROLS */}
+          <Text style={styles.betText}>Mise : {bet} €</Text>
+          
+          {insuranceBet > 0 && (
+            <Text style={styles.insuranceText}>
+              Assurance : {insuranceBet} €
+            </Text>
+          )}
+
+          {gameStarted ? (
+            <>
+              <View style={styles.buttonsRow}>
+                <ActionButton label="Tirer"    color="#D7263D" onPress={hit}        disabled={!playerTurn} />
+                <ActionButton label="Rester"   color="#1FA774" onPress={stand}      disabled={!playerTurn} />
+                <ActionButton label="Doubler"  color="#46B3E6" onPress={doubleDown} disabled={!playerTurn} />
+                <ActionButton label="Split"    color="#F2C94C" /*onPress={}*/       disabled={!canSplit || !playerTurn} />
+              </View>
+              <Text style={styles.info}>{message}</Text>
+            </>
+          ) : (
+            <>
+              <View style={styles.chipsRow}>
+                {[1, 5, 10, 50, 100, 500].map(v => (
+                  <Chip key={v} value={v} credits={credits} addBet={addBet} />
+                ))}
+              </View>
+              <TouchableOpacity style={styles.startBtn} onPress={initGame}>
+                <Text style={styles.startBtnText}>Commencer la partie</Text>
+              </TouchableOpacity>
+              <Text style={styles.info}>{message}</Text>
+            </>
+          )}
+
+          {/* FOOTER (CREDITS) */}
+          <ImageBackground
+            source={require('../assets/images/wood.png')}
+            style={styles.creditsBar}
+            imageStyle={styles.creditsBarImage}
+          >
+            <Text style={styles.creditsText}>{credits} €</Text>
+          </ImageBackground>
+
         </View>
       </View>
     </>
@@ -324,48 +332,49 @@ const ActionButton = ({ label, color, onPress, disabled }: any) => (
 
 /* ---------- STYLES ---------- */
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#7A0000', paddingTop: 30, alignItems: 'center' },
+  container: { flex: 1, backgroundColor: '#7A0000', alignItems: 'center', justifyContent: 'flex-start', paddingTop: 20 },
   header: { width: '100%', flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20 },
   menuText: { color: 'white', fontSize: 22, fontFamily: 'Cinzel', paddingTop:20 },
   deckIcon: { width: 60, height: 80, transform: [{ rotate: '20deg' }] },
 
-  scoreText: { color: 'white', fontSize: 18, marginVertical: 5 },
-  rules: { color: '#EEE', fontSize: 12, textAlign: 'center', marginVertical: 5 },
+  /* ---------- GAME AREA ---------- */
+  gameArea: { flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center', paddingBottom: 50 },
 
-  betText: { color: '#EEE', marginVertical: 10 },
-  insuranceText: { color: '#6EC6FF', marginBottom: 4 },
+  /* ---------- SCORES ---------- */
+  scoreText: { color: 'white', fontFamily: 'Cinzel', fontSize: 30, marginVertical: 5 },
+  rules: { color: '#EEE', fontSize: 16, fontFamily: 'Cinzel', textAlign: 'center', marginVertical: 5 },
 
-  buttonsRow: { flexDirection: 'row', justifyContent: 'space-around', width: '100%' },
-  actionBtn: { paddingVertical: 10, paddingHorizontal: 12, borderRadius: 6, marginHorizontal: 3 },
-  actionBtnText: { color: '#111', fontWeight: '700' },
+  /* ---------- MISE ET ASSURANCE ---------- */
+  betText: { color: '#EEE', fontFamily: 'Cinzel', marginVertical: 10 },
+  insuranceText: { color: '#6EC6FF', fontFamily: 'Cinzel', marginBottom: 4 },
 
+  /* ---------- BOUTONS D'ACTION ---------- */
+  buttonsRow: { flexDirection: 'row', justifyContent: 'space-around', width: '80%', marginVertical: 16 },
+  actionBtn: { paddingVertical: 12, paddingHorizontal: 12, borderRadius: 6, marginHorizontal: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 3 },
+  actionBtnText: { color: '#111', fontFamily: 'Cinzel', fontWeight: '700' },
+
+  /* ---------- SELECTEUR DE MISE ---------- */
   chipsRow: { flexDirection: 'row', marginVertical: 15, justifyContent: 'center' },
 
+  /* ---------- START BUTTON ---------- */
   startBtn: { backgroundColor: '#DDD', paddingVertical: 10, paddingHorizontal: 20, borderRadius: 4 },
-  startBtnText: { color: '#111', fontWeight: '600' },
+  startBtnText: { color: '#111', fontFamily: 'Cinzel', fontWeight: '600' },
 
-  info: { color: '#FFD700', marginTop: 10 },
+  /* ---------- MESSAGE DE WIN/LOSE ---------- */
+  info: { color: '#FFD700', fontFamily: 'Cinzel', marginTop: 10 },
 
-  creditsBar: { position: 'absolute', bottom: 0, width: '100%', backgroundColor: '#865C2D', padding: 20 },
-  creditsText: { color: 'white', textAlign: 'center', fontSize: 32, fontWeight: '700' },
+  /* ---------- CREDITS ---------- */
+  creditsBar: { position: 'absolute', bottom: 0, width: '120%', backgroundColor: '#865C2D', padding: 20 },
+  creditsBarImage: { resizeMode: 'cover' },
+  creditsText: { color: 'white', textAlign: 'center', fontFamily: 'Cinzel', fontSize: 32, fontWeight: '700', textShadowColor: '#000', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
 
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalBox: {
-    width: '80%',
-    backgroundColor: '#222',
-    borderRadius: 8,
-    padding: 20,
-    alignItems: 'center',
-  },
-  modalTitle: { color: '#FFD700', fontSize: 20, marginBottom: 8 },
-  modalText: { color: '#EEE', textAlign: 'center', marginBottom: 15 },
+  /* ---------- MODAL ASSURANCE ---------- */
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
+  modalBox: { width: '80%', backgroundColor: '#222', borderRadius: 8, padding: 20, alignItems: 'center' },
+  modalTitle: { color: '#FFD700', fontFamily: 'Cinzel', fontSize: 20, marginBottom: 8 },
+  modalText: { color: '#EEE', fontFamily: 'Cinzel', textAlign: 'center', marginBottom: 15 },
   modalBtns: { flexDirection: 'row' },
   yesBtn: { backgroundColor: '#1FA774', padding: 10, borderRadius: 6, marginHorizontal: 5 },
   noBtn:  { backgroundColor: '#D7263D', padding: 10, borderRadius: 6, marginHorizontal: 5 },
-  btnTxt: { color: '#fff', fontWeight: '600' },
+  btnTxt: { color: '#fff', fontFamily: 'Cinzel', fontWeight: '600' },
 });
