@@ -6,6 +6,8 @@ import { generateDeck } from '../utils/generateDeck';
 import { getHandTotals } from '../utils/handTotals';
 import Chip from '../components/Chip';
 import { useNavigation } from '@react-navigation/native';
+import RulesModal from '../components/RulesModal';
+import Feather from '@expo/vector-icons/Feather';
 
 const INITIAL_CREDITS = 1000;
 
@@ -23,6 +25,7 @@ export default function BlackjackScreen() {
   const [insuranceBet, setInsuranceBet] = useState<number>(0);
   const [playerFlipped, setPlayerFlipped] = useState<boolean[]>([false, false]);
   const [dealerFlipped, setDealerFlipped] = useState<boolean[]>([false]);
+  const [showRules, setShowRules] = useState<boolean>(false);
 
   /* ---------- CONSTANTS ---------- */
   const canSplit = gameStarted && playerTurn && playerHand.length === 2 && playerHand[0].value === playerHand[1].value;
@@ -305,8 +308,14 @@ const hit = () => {
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <Text style={styles.menuText}>← Menu</Text>
           </TouchableOpacity>
-          <Image source={require('../assets/cartes/back.png')} style={styles.deckIcon} />
+          <TouchableOpacity onPress={() => setShowRules(true)}>
+            <Feather name="info" style={styles.infoBtn} size={24} />
+          </TouchableOpacity>
+          {/* <Image source={require('../assets/cartes/back.png')} style={styles.deckIcon} /> */}
         </View>
+
+        {/* Dans BlackjackScreen.tsx */}
+        <RulesModal visible={showRules} onClose={() => setShowRules(false)} />
 
         {/* DEALER */}
         <View style={styles.gameArea}>
@@ -389,7 +398,8 @@ const ActionButton = ({ label, color, onPress, disabled }: any) => (
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#7A0000', alignItems: 'center', justifyContent: 'flex-start', paddingTop: 20 },
   header: { width: '100%', flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20 },
-  menuText: { color: 'white', fontSize: 22, fontFamily: 'Cinzel', paddingTop:20 },
+  menuText: { color: 'white', fontSize: 22, fontFamily: 'Cinzel', paddingTop: 30 },
+  infoBtn: { color: 'white', paddingTop: 30 },
   deckIcon: { width: 60, height: 80, transform: [{ rotate: '20deg' }] },
 
   /* ---------- GAME AREA ---------- */
