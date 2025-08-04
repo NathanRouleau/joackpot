@@ -12,18 +12,19 @@ export default function HomeScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>🎰 Bienvenue sur JOAckpot !</Text>
 
-      <TouchableOpacity
-        style={styles.button}
-        onPress={() => navigation.navigate('Blackjack')}
-      >
+      {/* BLACKJACK */}
+      <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('Blackjack')}>
         <Text style={styles.buttonText}>🃏 Jouer au Blackjack</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity
-        style={styles.button}
-        onPress={() => navigation.navigate('Roulette')}
-      >
+      {/* ROULETTE */}
+      <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('Roulette')}>
         <Text style={styles.buttonText}>🎯 Jouer à la Roulette</Text>
+      </TouchableOpacity>
+
+      {/* MACHINE À SOUS */}
+      <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('SlotMachine')}>
+        <Text style={styles.buttonText}>🎰 Jouer à la machine à sous</Text>
       </TouchableOpacity>
     </View>
   );
