@@ -1,20 +1,18 @@
 import React, { useRef, useEffect } from 'react';
-import {
-  Animated,
-  StyleSheet,
-  TouchableWithoutFeedback,
-  View,
-} from 'react-native';
+import { Animated, StyleSheet, TouchableWithoutFeedback, View, ImageSourcePropType } from 'react-native';
 import { Card as CardType } from '../types/Card';
+
+// import backCardImage from '../assets/cartes/back.png';
+const backCardImage = require('../assets/cartes/back.png');
 
 type Props = {
   card: CardType;
   hidden?: boolean;
   onFlip?: () => void;
+  backImage?: ImageSourcePropType;
 };
 
-export default function FlipCard({ card, hidden = false, onFlip }: Props) {
-  // Toujours synchroniser avec la prop !
+export default function FlipCard({ card, hidden = false, onFlip, backImage = backCardImage }: Props) {
   const flipAnim = useRef(new Animated.Value(hidden ? 180 : 0)).current;
 
   useEffect(() => {
@@ -23,7 +21,6 @@ export default function FlipCard({ card, hidden = false, onFlip }: Props) {
       duration: 400,
       useNativeDriver: true,
     }).start(() => onFlip && onFlip());
-    // eslint-disable-next-line
   }, [hidden]);
 
   const frontRotate = flipAnim.interpolate({
@@ -39,14 +36,15 @@ export default function FlipCard({ card, hidden = false, onFlip }: Props) {
     <TouchableWithoutFeedback>
       <View style={styles.cardContainer}>
         {/* Dos de la carte */}
-        <Animated.View
+        <Animated.Image
+          source={ backCardImage }
           style={[
             styles.card,
             styles.hiddenFace,
             { transform: [{ rotateY: frontRotate }] },
           ]}
         />
-        {/* Face valeur */}
+        {/* Carte de face */}
         <Animated.Image
           source={card.image}
           style={[
@@ -73,8 +71,8 @@ const styles = StyleSheet.create({
     backfaceVisibility: 'hidden',
   },
   hiddenFace: {
-    backgroundColor: '#222',
     borderRadius: 4,
+    resizeMode: 'contain',
   },
   visibleFace: {
     resizeMode: 'contain',
