@@ -14,21 +14,22 @@ const INITIAL_CREDITS = 1000;
 export default function BlackjackScreen() {
   /* ---------- STATE ---------- */
   const [deck, setDeck] = useState<CardType[]>([]);
-  const [playerHand, setPlayerHand] = useState<CardType[]>([]);
+  const [playerHands, setPlayerHands] = useState<CardType[][]>([[]]);
+  const [currentHandIndex, setCurrentHandIndex] = useState(0);
   const [dealerHand, setDealerHand] = useState<CardType[]>([]);
   const [credits, setCredits] = useState<number>(INITIAL_CREDITS);
-  const [bet, setBet] = useState<number>(0);
+  const [bets, setBets] = useState<number[]>([0]);
   const [gameStarted, setGameStarted] = useState<boolean>(false);
   const [playerTurn, setPlayerTurn] = useState<boolean>(true);
   const [message, setMessage] = useState<string>('Commencer la partie');
   const [insuranceOffered, setInsuranceOffered] = useState<boolean>(false);
   const [insuranceBet, setInsuranceBet] = useState<number>(0);
-  const [playerFlipped, setPlayerFlipped] = useState<boolean[]>([false, false]);
+  const [playerFlipped, setPlayerFlipped] = useState<boolean[][]>([[true, true]]);
   const [dealerFlipped, setDealerFlipped] = useState<boolean[]>([false]);
   const [showRules, setShowRules] = useState<boolean>(false);
 
   /* ---------- CONSTANTS ---------- */
-  const canSplit = gameStarted && playerTurn && playerHand.length === 2 && playerHand[0].value === playerHand[1].value;
+  const canSplit = gameStarted && playerTurn && playerHands[currentHandIndex].length === 2 && playerHands[currentHandIndex][0].value === playerHands[currentHandIndex][1].value;
   const isBlackjack = (hand: CardType[]) => hand.length === 2 && bestValue(hand) === 21;
   const dealerShowsAce = (dealerUp: CardType) => dealerUp.value === 'As';
 
@@ -56,7 +57,7 @@ export default function BlackjackScreen() {
 
   /* ---------- GAME FLOW ---------- */
   const initGame = () => {
-    if (bet === 0) {
+    if (bets[0] === 0) {
       setMessage('Place une mise avant !');
       return;
     }
@@ -69,19 +70,25 @@ export default function BlackjackScreen() {
     });
 
     const initialPlayerHand = [p1, p2];
+    // const initialPlayerHand = [
+    //   { value: 'Huit', suit: 'Coeur', image: require('../assets/cartes/HuitDeCoeur.png') },
+    //   { value: 'Huit', suit: 'Coeur', image: require('../assets/cartes/HuitDeCoeur.png') },
+
+    // ];
     const initialDealerHand = [d1];
 
     // On met d'abord à jour les mains ET les flips (tout au dos)
-    setPlayerHand(initialPlayerHand);
+    setPlayerHands([initialPlayerHand]);
+    setCurrentHandIndex(0);
     setDealerHand(initialDealerHand);
     setDeck(newDeck);
 
-    setPlayerFlipped([false, false]);
+    setPlayerFlipped([[false, false]]);
     setDealerFlipped([false]);
 
     // Animation du flip décalé
     setTimeout(() => {
-      setPlayerFlipped([true, false]);
+      setPlayerFlipped([[true, false]]);
     }, 500);
 
     setTimeout(() => {
@@ -89,7 +96,7 @@ export default function BlackjackScreen() {
     }, 1000);
 
     setTimeout(() => {
-      setPlayerFlipped([true, true]);
+      setPlayerFlipped([[true, true]]);
     }, 1500);
     
     const playerBJ = isBlackjack([p1, p2]);
@@ -97,8 +104,8 @@ export default function BlackjackScreen() {
 
     if (playerBJ && !dealerUpIsAce) {
       // Le joueur a un Blackjack & le croupier n'a ni As ni 10
-      setCredits(c => c + bet * 2.5);
-      setBet(0);
+      setCredits(c => c + bets[0] * 2.5);
+      setBets([0]);
       setGameStarted(false);
       setPlayerTurn(false);
       setMessage('Blackjack ! Paiement 3 pour 2.');
@@ -113,51 +120,149 @@ export default function BlackjackScreen() {
     }
   };
 
-const hit = () => {
-  if (!playerTurn) return;
-  const [card, newDeck] = drawCard(deck);
+  const hit = () => {
+    if (!playerTurn) return;
+    const [card, newDeck] = drawCard(deck);
 
-  setPlayerHand(prevHand => {
-    const updatedHand = [...prevHand, card];
+    setPlayerHands(prevHands => {
+      const updatedHands = [...prevHands];
+      const updatedCurrentHand = [...updatedHands[currentHandIndex], card];
+      updatedHands[currentHandIndex] = updatedCurrentHand;
 
-    setPlayerFlipped(prev => [...prev, false]);
-    setTimeout(() => {
+      // Animation du flip
       setPlayerFlipped(prev => {
         const next = [...prev];
-        next[next.length - 1] = true;
+        if (!next[currentHandIndex]) next[currentHandIndex] = [];
+        next[currentHandIndex] = [...(next[currentHandIndex] || []), false];
         return next;
       });
+      setTimeout(() => {
+        setPlayerFlipped(prev => {
+          const next = [...prev];
+          next[currentHandIndex] = [...(next[currentHandIndex] || [])];
+          next[currentHandIndex][updatedCurrentHand.length - 1] = true;
+          return next;
+        });
 
-      const total = bestValue(updatedHand);
-      if (total >= 21) {
-        setTimeout(() => {
-          setPlayerTurn(false);
-        }, 1000); 
-      }
-    }, 500);
+        const total = bestValue(updatedCurrentHand);
+        if (total > 21) {
+          if (currentHandIndex < updatedHands.length - 1) {
+            setCurrentHandIndex(i => i + 1);
+          } else {
+            setTimeout(() => {
+              setPlayerTurn(false);
+            }, 1000);
+          }
+        }
+      }, 500);
 
-    return updatedHand;
-  });
+      return updatedHands;
+    });
 
-  setDeck(newDeck);
-};
+    setDeck(newDeck);
+  };
 
   const stand = () => {
-    setPlayerTurn(false);
+    if (currentHandIndex < playerHands.length - 1) {
+      setCurrentHandIndex(i => i + 1);
+    } else {
+      setPlayerTurn(false);
+    }
   };
 
   const doubleDown = () => {
-    if (!playerTurn || credits < bet) return;
-    setCredits(c => c - bet);
-    setBet(b => b * 2);
+    if (!playerTurn || credits < bets[0] || playerHands.length > 1) return;
+    setCredits(c => c - bets[0]);
+    setBets(betsArr => {
+      const arr = [...betsArr];
+      arr[currentHandIndex] = arr[currentHandIndex] * 2;
+      return arr;
+    });
     hit();
     setTimeout(() => {
       setPlayerTurn(false);
     }, 1000); 
   };
 
+  const splitHand = () => {
+    const oldBets = [...bets];
+    const newBet = oldBets[currentHandIndex];
+
+    if (credits < newBet) {
+      setMessage('Pas assez de crédits pour splitter !');
+      return;
+    }
+
+    // Récupère la main actuelle
+    const hands = [...playerHands];
+    const handToSplit = hands[currentHandIndex];
+
+    // Vérifie si la main peut être splittée
+    if (
+      hands.length >= 3 ||
+      handToSplit.length !== 2 ||
+      handToSplit[0].value !== handToSplit[1].value
+    ) {
+      setMessage('Impossible de splitter cette main.');
+      return;
+    }
+
+    // On split les flips
+    const oldFlips = playerFlipped[currentHandIndex] || [true, true]; // sécurité
+    const newFlipped1 = [oldFlips[0], false];
+    const newFlipped2 = [oldFlips[1], false];
+
+    const newFlipped = [
+      ...playerFlipped.slice(0, currentHandIndex),
+      newFlipped1,
+      newFlipped2,
+      ...playerFlipped.slice(currentHandIndex + 1)
+    ];
+
+    setPlayerFlipped(newFlipped);
+
+    // Animation (optionnelle) : tu peux flip direct la 2e carte tirée
+    setTimeout(() => {
+      setPlayerFlipped(prev => {
+        const copy = [...prev];
+        copy[currentHandIndex][1] = true;
+        copy[currentHandIndex + 1][1] = true;
+        return copy;
+      });
+    }, 500);
+
+    const newHand1 = [handToSplit[0]];
+    const newHand2 = [handToSplit[1]];
+    let newDeck = [...deck];
+
+    // On remplace la main actuelle par les deux nouvelles mains
+    const newHands = [
+      ...hands.slice(0, currentHandIndex),
+      newHand1,
+      newHand2,
+      ...hands.slice(currentHandIndex + 1),
+    ];
+
+    const newBets = [
+      ...oldBets.slice(0, currentHandIndex),
+      newBet,
+      newBet,
+      ...oldBets.slice(currentHandIndex + 1),
+    ];
+    setBets(newBets);
+    setCredits(c => c - newBet);
+
+    setPlayerHands(newHands);
+    setDeck(newDeck);
+
+    // On reste sur la première main
+    setCurrentHandIndex(currentHandIndex);
+
+    // On va doubler la mise et vérifier les crédit plus tard
+  };
+
   const takeInsurance = () => {
-    const maxIns = bet / 2;
+    const maxIns = bets[0] / 2;
     if (credits >= maxIns) {
       setCredits(c => c - maxIns);
       setInsuranceBet(maxIns);
@@ -216,60 +321,68 @@ const hit = () => {
   }, [playerTurn]);
 
   const resolveWinner = (finalDealerHand: CardType[]) => {
-    const playerScore = bestValue(playerHand);
     const dealerScore = bestValue(finalDealerHand);
+    
+    let resultMsgs = [];
+    let gain = 0;
 
-    const playerBJ  = isBlackjack(playerHand);
-    const dealerBJ  = isBlackjack(finalDealerHand);
+    playerHands.forEach((hand, idx) => {
+      const playerScore = bestValue(hand);
+      const playerBJ = isBlackjack(hand);
+      const dealerBJ = isBlackjack(finalDealerHand);
 
-    let resultMsg = '';
+      let msg = `Main ${idx + 1} : `;
 
-    /* ----- CAS BLACKJACKS ----- */
-    if (playerBJ && dealerBJ) {
-      resultMsg = 'Égalité !';
-      setCredits(c => c + bet);
-    } else if (playerBJ) {
-      resultMsg = 'Blackjack ! Paiement 3 : 2.';
-      setCredits(c => c + bet * 2.5);
-    } else if (dealerBJ) {
-      resultMsg = 'Le croupier a Blackjack. Tu perds ta mise.';
-    }
+      /* ----- CAS BLACKJACKS ----- */
+      if (playerBJ && dealerBJ) {
+        msg = 'Égalité (Blackjack) !';
+        gain += bets[idx];
+      } else if (playerBJ) {
+        msg = 'Blackjack ! Paiement 3:2.';
+        gain += bets[idx] * 2.5;
+      } else if (dealerBJ) {
+        msg = 'Le croupier a Blackjack. Perdu.';
+      }
 
-    /* ----- CAS CLASSIQUES ----- */
-    else if (playerScore > 21) {
-      resultMsg = 'Bust ! Le croupier gagne.';
-    } else if (dealerScore > 21 || playerScore > dealerScore) {
-      resultMsg = 'Tu gagnes !';
-      setCredits(c => c + bet * 2);
-    } else if (playerScore === dealerScore) {
-      resultMsg = 'Égalité.';
-      setCredits(c => c + bet);
-    } else {
-      resultMsg = 'Le croupier gagne.';
-    }
+      /* ----- CAS CLASSIQUES ----- */
+      else if (playerScore > 21) {
+        msg = 'Bust ! Le croupier gagne.';
+      } else if (dealerScore > 21 || playerScore > dealerScore) {
+        msg = 'Tu gagnes !';
+        gain += bets[idx] * 2;;
+      } else if (playerScore === dealerScore) {
+        msg = 'Égalité.';
+        gain += bets[idx];
+      } else {
+        msg = 'Le croupier gagne.';
+      }
+
+      resultMsgs.push(msg);
+    });
 
     /* ===== PAIEMENT / PERTE ASSURANCE ===== */
     if (insuranceBet > 0) {
-      if (dealerBJ) {
+      if (isBlackjack(finalDealerHand)) {
         // on rend insuranceBet + 2× gain  → total ×3
-        setCredits(c => c + insuranceBet * 3);
-        resultMsg += '\nAssurance payée 2:1.';
+        gain += insuranceBet * 3;
+        resultMsgs.push('Assurance payée 2:1.');
       } else {
-        resultMsg += '\nAssurance perdue.';
+        resultMsgs.push('Assurance perdue.');
       }
       setInsuranceBet(0);
     }
 
     /* ----- FIN DE MANCHE ----- */
-    setMessage(resultMsg);
+    setCredits(c => c + gain);
+    setMessage(resultMsgs.join('\n'));
     setGameStarted(false);
-    setBet(0);
+    setBets([0]);
   };
 
 
   const addBet = (amount: number) => {
-    if(!gameStarted && credits >= amount) {
-      setBet(b => b + amount);
+    if (!gameStarted && credits >= amount) {
+      setBets(prev => [prev[0] + amount]);
       setCredits(c => c - amount);
     }
   }
@@ -288,7 +401,7 @@ const hit = () => {
             <Text style={styles.modalTitle}>Assurance ?</Text>
             <Text style={styles.modalText}>
               Le croupier montre un As/10.{'\n'}
-              Tu peux assurer pour {bet / 2} € (paye 2:1).
+              Tu peux assurer pour {bets[0] / 2} € (paye 2:1).
             </Text>
             <View style={styles.modalBtns}>
               <TouchableOpacity style={styles.yesBtn} onPress={takeInsurance}>
@@ -333,11 +446,15 @@ const hit = () => {
           </Text>
 
           {/* PLAYER */}
-          <Hand cards={playerHand} flipped={playerFlipped} />
-          <Text style={styles.scoreText}>{formatTotals(playerHand)}</Text>
+          {playerHands.map((hand, idx) => (
+            <View key={idx} style={{ marginVertical: 8 }}>
+              <Hand cards={hand} flipped={playerFlipped[idx]} />
+              <Text style={styles.scoreText}>{formatTotals(hand)}</Text>
+            </View>
+          ))}
 
           {/* BET & CONTROLS */}
-          <Text style={styles.betText}>Mise : {bet} €</Text>
+          <Text style={styles.betText}>Mise : {bets[0]} €</Text>
           
           {insuranceBet > 0 && (
             <Text style={styles.insuranceText}>
@@ -351,7 +468,9 @@ const hit = () => {
                 <ActionButton label="Tirer"    color="#D7263D" onPress={hit}        disabled={!playerTurn} />
                 <ActionButton label="Rester"   color="#1FA774" onPress={stand}      disabled={!playerTurn} />
                 <ActionButton label="Doubler"  color="#46B3E6" onPress={doubleDown} disabled={!playerTurn} />
-                <ActionButton label="Split"    color="#F2C94C" /*onPress={}*/       disabled={!canSplit || !playerTurn} />
+                { canSplit && (
+                  <ActionButton label="Split"    color="#F2C94C" onPress={splitHand}  disabled={!canSplit || !playerTurn} />
+                )}
               </View>
               <Text style={styles.info}>{message}</Text>
             </>
@@ -370,21 +489,16 @@ const hit = () => {
           )}
 
           {/* FOOTER (CREDITS) */}
-          <ImageBackground
-            source={require('../assets/images/wood.png')}
-            style={styles.creditsBar}
-            imageStyle={styles.creditsBarImage}
-          >
+          <ImageBackground source={require('../assets/images/wood.png')} style={styles.creditsBar} imageStyle={styles.creditsBarImage}>
             <Text style={styles.creditsText}>{credits} €</Text>
           </ImageBackground>
-
         </View>
       </View>
     </>
   );
 }
 
-/* ---------- PETITS COMPOS INTERNES ---------- */
+/* ---------- PETITS COMPONENT BOUTONS ---------- */
 const ActionButton = ({ label, color, onPress, disabled }: any) => (
   <TouchableOpacity
     style={[styles.actionBtn, { backgroundColor: color, opacity: disabled ? 0.4 : 1 }]}
@@ -406,7 +520,7 @@ const styles = StyleSheet.create({
   gameArea: { flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center', paddingBottom: 50 },
 
   /* ---------- SCORES ---------- */
-  scoreText: { color: 'white', fontFamily: 'Cinzel', fontSize: 30, marginVertical: 5 },
+  scoreText: { color: 'white', fontFamily: 'Cinzel', textAlign: 'center', fontSize: 30, marginVertical: 5 },
   rules: { color: '#EEE', fontSize: 16, fontFamily: 'Cinzel', textAlign: 'center', marginVertical: 5 },
 
   /* ---------- MISE ET ASSURANCE ---------- */
