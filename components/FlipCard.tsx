@@ -10,9 +10,10 @@ type Props = {
   hidden?: boolean;
   onFlip?: () => void;
   backImage?: ImageSourcePropType;
+  scale?: number;
 };
 
-export default function FlipCard({ card, hidden = false, onFlip, backImage = backCardImage }: Props) {
+export default function FlipCard({ card, hidden = false, onFlip, backImage = backCardImage, scale = 1 }: Props) {
   const flipAnim = useRef(new Animated.Value(hidden ? 180 : 0)).current;
 
   useEffect(() => {
@@ -23,35 +24,21 @@ export default function FlipCard({ card, hidden = false, onFlip, backImage = bac
     }).start(() => onFlip && onFlip());
   }, [hidden]);
 
-  const frontRotate = flipAnim.interpolate({
-    inputRange: [0, 180],
-    outputRange: ['0deg', '180deg'],
-  });
-  const backRotate = flipAnim.interpolate({
-    inputRange: [0, 180],
-    outputRange: ['180deg', '360deg'],
-  });
+  const frontRotate = flipAnim.interpolate({ inputRange: [0, 180], outputRange: ['0deg', '180deg'] });
+  const backRotate = flipAnim.interpolate({ inputRange: [0, 180], outputRange: ['180deg', '360deg'] });
 
   return (
     <TouchableWithoutFeedback>
-      <View style={styles.cardContainer}>
+      <View style={[styles.cardContainer, { width: 60 * scale, height: 90 * scale, marginHorizontal: 5 * scale }]}>
         {/* Dos de la carte */}
         <Animated.Image
           source={ backCardImage }
-          style={[
-            styles.card,
-            styles.hiddenFace,
-            { transform: [{ rotateY: frontRotate }] },
-          ]}
+          style={[styles.card, styles.hiddenFace, { width: 60 * scale, height: 90 * scale, transform: [{ rotateY: frontRotate }] }]}
         />
         {/* Carte de face */}
         <Animated.Image
           source={card.image}
-          style={[
-            styles.card,
-            styles.visibleFace,
-            { transform: [{ rotateY: backRotate }] },
-          ]}
+          style={[styles.card, styles.visibleFace, { width: 60 * scale, height: 90 * scale, transform: [{ rotateY: backRotate }] }]}
         />
       </View>
     </TouchableWithoutFeedback>

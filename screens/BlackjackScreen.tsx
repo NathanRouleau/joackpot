@@ -32,6 +32,7 @@ export default function BlackjackScreen() {
   const canSplit = gameStarted && playerTurn && playerHands[currentHandIndex].length === 2 && playerHands[currentHandIndex][0].value === playerHands[currentHandIndex][1].value;
   const isBlackjack = (hand: CardType[]) => hand.length === 2 && bestValue(hand) === 21;
   const dealerShowsAce = (dealerUp: CardType) => dealerUp.value === 'As';
+  const handScale = (len: number) => (len === 1 ? 1 : len === 2 ? 0.9 : 0.8);
 
   /* ---------- HELPERS ---------- */
   const drawCard = (currentDeck: CardType[]): [CardType, CardType[]] => {
@@ -171,8 +172,8 @@ export default function BlackjackScreen() {
   };
 
   const doubleDown = () => {
-    if (!playerTurn || credits < bets[0] || playerHands.length > 1) return;
-    setCredits(c => c - bets[0]);
+    if (!playerTurn || credits < bets[currentHandIndex] || playerHands.length > 1) return;
+    setCredits(c => c - bets[currentHandIndex]);
     setBets(betsArr => {
       const arr = [...betsArr];
       arr[currentHandIndex] = arr[currentHandIndex] * 2;
@@ -208,7 +209,7 @@ export default function BlackjackScreen() {
     }
 
     // On split les flips
-    const oldFlips = playerFlipped[currentHandIndex] || [true, true]; // sécurité
+    const oldFlips = playerFlipped[currentHandIndex] || [true, true];
     const newFlipped1 = [oldFlips[0], false];
     const newFlipped2 = [oldFlips[1], false];
 
@@ -220,16 +221,6 @@ export default function BlackjackScreen() {
     ];
 
     setPlayerFlipped(newFlipped);
-
-    // Animation (optionnelle) : tu peux flip direct la 2e carte tirée
-    setTimeout(() => {
-      setPlayerFlipped(prev => {
-        const copy = [...prev];
-        copy[currentHandIndex][1] = true;
-        copy[currentHandIndex + 1][1] = true;
-        return copy;
-      });
-    }, 500);
 
     const newHand1 = [handToSplit[0]];
     const newHand2 = [handToSplit[1]];
@@ -448,12 +439,12 @@ export default function BlackjackScreen() {
           {/* JOUEUR */}
           <View style={{ flexDirection: 'row', justifyContent: playerHands.length === 1 ? 'center' : 'space-evenly', alignItems: 'flex-end', gap: 16 }}>
             {playerHands.map((hand, idx) => (
-              <View key={idx} style={{ alignItems: 'center' }}>
+              <View key={idx} style={[{ alignItems: 'center' }, playerHands.length > 1 && idx === currentHandIndex && styles.activeHand]}>
                 <Hand
                   cards={hand}
                   flipped={playerFlipped[idx]}
                   stacked={playerHands.length > 1}
-                  /*scale={playerHands.length > 1 ? 0.9 : 1}*/
+                  scale={playerHands.length > 1 ? 0.9 : 1}
                 />
                 <Text style={styles.scoreText}>{formatTotals(hand)}</Text>
                 <Text style={styles.betText}>Mise : {bets[idx]} €</Text>
@@ -472,7 +463,7 @@ export default function BlackjackScreen() {
               <View style={styles.buttonsRow}>
                 <ActionButton label="Tirer"    color="#D7263D" onPress={hit}        disabled={!playerTurn} />
                 <ActionButton label="Rester"   color="#1FA774" onPress={stand}      disabled={!playerTurn} />
-                <ActionButton label="Doubler"  color="#46B3E6" onPress={doubleDown} disabled={!playerTurn} />
+                <ActionButton label="Doubler"  color="#46B3E6" onPress={doubleDown} disabled={!playerTurn || playerHands.length > 1} />
                 { canSplit && (
                   <ActionButton label="Split"    color="#F2C94C" onPress={splitHand}  disabled={!canSplit || !playerTurn} />
                 )}
@@ -523,6 +514,9 @@ const styles = StyleSheet.create({
 
   /* ---------- GAME AREA ---------- */
   gameArea: { flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center', paddingBottom: 50 },
+
+  /* ---------- MAIN DU JOUEUR ---------- */
+  activeHand: { borderWidth: 3, borderColor: '#FFD700', borderRadius: 8, shadowColor: '#FFD700', shadowOpacity: 0.9, shadowOffset: { width: 0, height: 0 }, shadowRadius: 10, elevation: 10, padding: 10, paddingRight: 20 },
 
   /* ---------- SCORES ---------- */
   scoreText: { color: 'white', fontFamily: 'Cinzel', textAlign: 'center', fontSize: 30, marginVertical: 5 },
