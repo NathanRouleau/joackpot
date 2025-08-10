@@ -445,16 +445,21 @@ export default function BlackjackScreen() {
             Assurance paie 2 pour 1
           </Text>
 
-          {/* PLAYER */}
-          {playerHands.map((hand, idx) => (
-            <View key={idx} style={{ marginVertical: 8 }}>
-              <Hand cards={hand} flipped={playerFlipped[idx]} />
-              <Text style={styles.scoreText}>{formatTotals(hand)}</Text>
-            </View>
-          ))}
-
-          {/* BET & CONTROLS */}
-          <Text style={styles.betText}>Mise : {bets[0]} €</Text>
+          {/* JOUEUR */}
+          <View style={{ flexDirection: 'row', justifyContent: playerHands.length === 1 ? 'center' : 'space-evenly', alignItems: 'flex-end', gap: 16 }}>
+            {playerHands.map((hand, idx) => (
+              <View key={idx} style={{ alignItems: 'center' }}>
+                <Hand
+                  cards={hand}
+                  flipped={playerFlipped[idx]}
+                  stacked={playerHands.length > 1}
+                  /*scale={playerHands.length > 1 ? 0.9 : 1}*/
+                />
+                <Text style={styles.scoreText}>{formatTotals(hand)}</Text>
+                <Text style={styles.betText}>Mise : {bets[idx]} €</Text>
+              </View>
+            ))}
+          </View>
           
           {insuranceBet > 0 && (
             <Text style={styles.insuranceText}>
