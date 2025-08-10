@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Modal, ImageBackground } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, ImageBackground, Animated } from 'react-native';
 import { Card as CardType } from '../types/Card';
 import Hand from '../components/Hand';
 import { generateDeck } from '../utils/generateDeck';
@@ -33,6 +33,28 @@ export default function BlackjackScreen() {
   const isBlackjack = (hand: CardType[]) => hand.length === 2 && bestValue(hand) === 21;
   const dealerShowsAce = (dealerUp: CardType) => dealerUp.value === 'As';
   const handScale = (len: number) => (len === 1 ? 1 : len === 2 ? 0.9 : 0.8);
+  const glow = useRef(new Animated.Value(0.6)).current;
+
+  // Lance/stop l’animation quand on passe en mode split
+  useEffect(() => {
+    let loop: Animated.CompositeAnimation | undefined;
+
+    if (playerHands.length > 1) {
+      loop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(glow, { toValue: 0.65,   duration: 1200, useNativeDriver: false }),
+          Animated.timing(glow, { toValue: 0.35, duration: 1200, useNativeDriver: false }),
+        ])
+      );
+      loop.start();
+    } else {
+      glow.setValue(0.25);
+    }
+
+    return () => {
+      loop?.stop?.();
+    };
+  }, [playerHands.length]);
 
   /* ---------- HELPERS ---------- */
   const drawCard = (currentDeck: CardType[]): [CardType, CardType[]] => {
@@ -437,20 +459,44 @@ export default function BlackjackScreen() {
           </Text>
 
           {/* JOUEUR */}
-          <View style={{ flexDirection: 'row', justifyContent: playerHands.length === 1 ? 'center' : 'space-evenly', alignItems: 'flex-end', gap: 16 }}>
-            {playerHands.map((hand, idx) => (
-              <View key={idx} style={[{ alignItems: 'center' }, playerHands.length > 1 && idx === currentHandIndex && styles.activeHand]}>
-                <Hand
-                  cards={hand}
-                  flipped={playerFlipped[idx]}
-                  stacked={playerHands.length > 1}
-                  scale={playerHands.length > 1 ? 0.9 : 1}
-                />
-                <Text style={styles.scoreText}>{formatTotals(hand)}</Text>
-                <Text style={styles.betText}>Mise : {bets[idx]} €</Text>
-              </View>
-            ))}
+          <View style={{ flexDirection: 'row', justifyContent: playerHands.length === 1 ? 'center' : 'space-evenly', alignItems: 'flex-end', gap: 16, paddingTop: 10 }}>
+            {playerHands.map((hand, idx) => {
+              const isActive = playerHands.length > 1 && idx === currentHandIndex;
+
+              return (
+                    <Animated.View
+                      key={idx}
+                      style={{ alignItems: 'center', position: 'relative', marginHorizontal: 12 }}
+                    >
+                      {/* HALO DERRIÈRE (aucune bordure) */}
+                      {isActive && (
+                        <Animated.View
+                          pointerEvents="none"
+                          style={{
+                            position: 'absolute',
+                            top: -10, bottom: -10, left: -10, right: -10,
+                            borderRadius: 16,
+                            backgroundColor: '#FFD700',
+                            opacity: glow as any,
+                            zIndex: -1,
+                          }}
+                        />
+                      )}
+
+                      <Hand
+                        cards={hand}
+                        flipped={playerFlipped[idx]}
+                        stacked={playerHands.length > 1}
+                        scale={handScale(playerHands.length)}
+                      />
+
+                      <Text style={styles.scoreText}>{formatTotals(hand)}</Text>
+                      <Text style={styles.betText}>Mise : {bets[idx]} €</Text>
+                    </Animated.View>
+                  );
+            })}
           </View>
+
           
           {insuranceBet > 0 && (
             <Text style={styles.insuranceText}>
