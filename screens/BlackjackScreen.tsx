@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, ImageBackground, Animated } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, ImageBackground, Animated, Easing } from 'react-native';
 import { Card as CardType } from '../types/Card';
 import Hand from '../components/Hand';
 import { generateDeck } from '../utils/generateDeck';
@@ -8,6 +8,7 @@ import Chip from '../components/Chip';
 import { useNavigation } from '@react-navigation/native';
 import RulesModal from '../components/RulesModal';
 import Feather from '@expo/vector-icons/Feather';
+import GameResultPopup from '../components/GameResultPopup';
 
 const INITIAL_CREDITS = 1000;
 
@@ -28,12 +29,90 @@ export default function BlackjackScreen() {
   const [dealerFlipped, setDealerFlipped] = useState<boolean[]>([false]);
   const [showRules, setShowRules] = useState<boolean>(false);
 
+  // Animation victoire/défaite
+  const [popupVisible, setPopupVisible] = useState(false);
+  const [popupMessage, setPopupMessage] = useState('');
+  const [popupColor, setPopupColor] = useState('#fff');
+
+  // Animation crédits 
+  const creditAnim = useRef(new Animated.Value(credits)).current;
+  const [displayCredits, setDisplayCredits] = useState(credits); 
+
   /* ---------- CONSTANTS ---------- */
   const canSplit = gameStarted && playerTurn && playerHands[currentHandIndex].length === 2 && playerHands[currentHandIndex][0].value === playerHands[currentHandIndex][1].value;
   const isBlackjack = (hand: CardType[]) => hand.length === 2 && bestValue(hand) === 21;
   const dealerShowsAce = (dealerUp: CardType) => dealerUp.value === 'As';
   const handScale = (len: number) => (len === 1 ? 1 : len === 2 ? 0.9 : 0.8);
+
+  /* ---------- ANIMATIONS ---------- */
   const glow = useRef(new Animated.Value(0.6)).current;
+  const [gainToShow, setGainToShow] = useState(0);
+  const gainOpacity = useRef(new Animated.Value(0)).current;
+  const gainTranslate = useRef(new Animated.Value(0)).current;
+  const gainScale = useRef(new Animated.Value(0.8)).current;
+  const isCreditAnimating = useRef(false);
+
+  const barPulse = useRef(new Animated.Value(0)).current;
+
+  // Met à jour le texte affiché quand creditAnim bouge
+  useEffect(() => {
+    const id = creditAnim.addListener(({ value }) => {
+      setDisplayCredits(Math.round(value));
+    });
+    return () => {
+      creditAnim.removeListener(id);
+    };
+  }, []);
+
+  // Si credits change “sans animation” (ex: on place une mise), on sync le compteur direct
+  useEffect(() => {
+    if (isCreditAnimating.current) return; // ⚠️ ne pas casser l’anim en cours
+    creditAnim.setValue(credits);
+  }, [credits]);
+
+  // Lance l’animation complète (compteur + pastille + pulse)
+  const animateCreditChange = (delta: number, toValue: number) => {
+    if (delta === 0) return;
+
+    isCreditAnimating.current = true;
+
+    setGainToShow(delta);
+    gainOpacity.setValue(0);
+    gainTranslate.setValue(12);
+    gainScale.setValue(0.8);
+    barPulse.setValue(0);
+
+    Animated.parallel([
+      // Compteur
+      Animated.timing(creditAnim, {
+        toValue,
+        duration: 900,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: false,
+      }),
+
+      // Pastille flottante
+      Animated.sequence([
+        Animated.parallel([
+          Animated.timing(gainOpacity, { toValue: 1, duration: 150, useNativeDriver: true }),
+          Animated.spring(gainScale, { toValue: 1.08, friction: 4, useNativeDriver: true }),
+        ]),
+        Animated.parallel([
+          Animated.timing(gainTranslate, { toValue: -14, duration: 700, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+          Animated.timing(gainOpacity, { toValue: 0, duration: 350, delay: 400, useNativeDriver: true }),
+        ]),
+      ]),
+
+      // Pulse de la barre
+      Animated.sequence([
+        Animated.timing(barPulse, { toValue: 1, duration: 160, useNativeDriver: false }),
+        Animated.timing(barPulse, { toValue: 0, duration: 260, useNativeDriver: false }),
+      ]),
+    ]).start(() => {
+      isCreditAnimating.current = false;
+      setGainToShow(0);
+    });
+  };
 
   // Lance/stop l’animation quand on passe en mode split
   useEffect(() => {
@@ -338,6 +417,8 @@ export default function BlackjackScreen() {
     
     let resultMsgs = [];
     let gain = 0;
+    let mainPopupMsg = '';
+    let mainPopupColor = '#fff';
 
     playerHands.forEach((hand, idx) => {
       const playerScore = bestValue(hand);
@@ -350,24 +431,38 @@ export default function BlackjackScreen() {
       if (playerBJ && dealerBJ) {
         msg = 'Égalité (Blackjack) !';
         gain += bets[idx];
+        mainPopupMsg = 'ÉGALITÉ';
+        mainPopupColor = '#FFD700';
       } else if (playerBJ) {
         msg = 'Blackjack ! Paiement 3:2.';
         gain += bets[idx] * 2.5;
+        mainPopupMsg = 'BLACKJACK 🎉';
+        mainPopupColor = '#4CAF50';
       } else if (dealerBJ) {
         msg = 'Le croupier a Blackjack. Perdu.';
+        mainPopupMsg = 'DÉFAITE ❌';
+        mainPopupColor = '#D7263D';
       }
 
       /* ----- CAS CLASSIQUES ----- */
       else if (playerScore > 21) {
         msg = 'Bust ! Le croupier gagne.';
+        mainPopupMsg = 'BUST ❌';
+        mainPopupColor = '#D7263D';
       } else if (dealerScore > 21 || playerScore > dealerScore) {
         msg = 'Tu gagnes !';
-        gain += bets[idx] * 2;;
+        gain += bets[idx] * 2;
+        mainPopupMsg = 'VICTOIRE 🎉';
+        mainPopupColor = '#4CAF50';
       } else if (playerScore === dealerScore) {
         msg = 'Égalité.';
         gain += bets[idx];
+        mainPopupMsg = 'ÉGALITÉ';
+        mainPopupColor = '#FFD700';
       } else {
         msg = 'Le croupier gagne.';
+        mainPopupMsg = 'DÉFAITE ❌';
+        mainPopupColor = '#D7263D';
       }
 
       resultMsgs.push(msg);
@@ -386,10 +481,19 @@ export default function BlackjackScreen() {
     }
 
     /* ----- FIN DE MANCHE ----- */
+    const oldCredits = credits;
+    const newCredits = oldCredits + gain;
+    
+    animateCreditChange(gain, newCredits);
+
     setCredits(c => c + gain);
     setMessage(resultMsgs.join('\n'));
     setGameStarted(false);
     setBets([0]);
+
+    setPopupMessage(mainPopupMsg);
+    setPopupColor(mainPopupColor);
+    setPopupVisible(true);
   };
 
 
@@ -403,6 +507,12 @@ export default function BlackjackScreen() {
   /* ---------- RENDER ---------- */
   return (
     <>
+      <GameResultPopup
+        visible={popupVisible}
+        message={popupMessage}
+        color={popupColor}
+        onHide={() => setPopupVisible(false)}
+      />
       {/* MODAL ASSURANCE */}
       <Modal
         visible={insuranceOffered}
@@ -413,7 +523,7 @@ export default function BlackjackScreen() {
           <View style={styles.modalBox}>
             <Text style={styles.modalTitle}>Assurance ?</Text>
             <Text style={styles.modalText}>
-              Le croupier montre un As/10.{'\n'}
+              Le croupier montre un As.{'\n'}
               Tu peux assurer pour {bets[0] / 2} € (paye 2:1).
             </Text>
             <View style={styles.modalBtns}>
@@ -437,7 +547,6 @@ export default function BlackjackScreen() {
           <TouchableOpacity onPress={() => setShowRules(true)}>
             <Feather name="info" style={styles.infoBtn} size={24} />
           </TouchableOpacity>
-          {/* <Image source={require('../assets/cartes/back.png')} style={styles.deckIcon} /> */}
         </View>
 
         {/* Dans BlackjackScreen.tsx */}
@@ -531,9 +640,60 @@ export default function BlackjackScreen() {
           )}
 
           {/* FOOTER (CREDITS) */}
-          <ImageBackground source={require('../assets/images/wood.png')} style={styles.creditsBar} imageStyle={styles.creditsBarImage}>
+          {/* <ImageBackground source={require('../assets/images/wood.png')} style={styles.creditsBar} imageStyle={styles.creditsBarImage}>
             <Text style={styles.creditsText}>{credits} €</Text>
-          </ImageBackground>
+          </ImageBackground> */}
+          
+          {/* FOOTER (CREDITS) */}
+          <Animated.View
+            style={[ styles.creditsBar,
+              { backgroundColor: barPulse.interpolate({ inputRange: [0, 1], outputRange: ['#2a2a2a', '#343434'] }) as any,
+                transform: [{ scale: barPulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.02], }) as any
+                }],
+                shadowOpacity: barPulse.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.15, 0.35],
+                }) as any,
+                shadowRadius: barPulse.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [6, 12],
+                }) as any,
+              }
+            ]}
+          >
+            <Text style={styles.creditsText}>{displayCredits} €</Text>
+
+            {/* Pastille de gain/perte (centrée) */}
+{gainToShow !== 0 && (
+  <Animated.View
+    pointerEvents="none"
+    style={{
+      position: 'absolute',
+      left: '20%',
+      right: 0,
+      bottom: 75,
+      alignItems: 'center',
+      opacity: gainOpacity,
+      transform: [{ translateY: gainTranslate }, { scale: gainScale }],
+    }}
+  >
+    <Text
+      style={{
+        fontSize: 18,
+        fontWeight: '800',
+        color: gainToShow > 0 ? '#15c46b' : '#ff4757',
+        textShadowColor: 'rgba(0,0,0,0.5)',
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 3,
+      }}
+    >
+      {gainToShow > 0 ? `+${gainToShow} €` : `${gainToShow} €`}
+    </Text>
+  </Animated.View>
+)}
+
+          </Animated.View>
+
         </View>
       </View>
     </>
