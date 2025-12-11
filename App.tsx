@@ -2,6 +2,7 @@ import React from 'react';
 import { View, ActivityIndicator } from 'react-native';
 import AppNavigator from './navigation/AppNavigator';
 import { useFonts } from 'expo-font';
+import { AuthProvider } from './supabase/AuthContext';
 
 export default function App() {
   const [fontsLoaded] = useFonts({
@@ -17,5 +18,10 @@ export default function App() {
     );
   }
 
-  return <AppNavigator />;
+  return (
+    <AuthProvider>
+      <AppNavigator />;
+    </AuthProvider>
+  );
 }
+

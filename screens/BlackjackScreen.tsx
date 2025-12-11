@@ -9,6 +9,8 @@ import { useNavigation } from '@react-navigation/native';
 import RulesModal from '../components/RulesModal';
 import Feather from '@expo/vector-icons/Feather';
 import GameResultPopup from '../components/GameResultPopup';
+import TurnTimerRing from "../components/TurnTimerRing";
+import { useTurnTimer } from "../hooks/useTurnTimer";
 
 const INITIAL_CREDITS = 1000;
 
@@ -28,6 +30,7 @@ export default function BlackjackScreen() {
   const [playerFlipped, setPlayerFlipped] = useState<boolean[][]>([[true, true]]);
   const [dealerFlipped, setDealerFlipped] = useState<boolean[]>([false]);
   const [showRules, setShowRules] = useState<boolean>(false);
+  const [lastActionAt, setLastActionAt] = useState<number>(Date.now());
 
   // Animation victoire/défaite
   const [popupVisible, setPopupVisible] = useState(false);
@@ -43,6 +46,7 @@ export default function BlackjackScreen() {
   const isBlackjack = (hand: CardType[]) => hand.length === 2 && bestValue(hand) === 21;
   const dealerShowsAce = (dealerUp: CardType) => dealerUp.value === 'As';
   const handScale = (len: number) => (len === 1 ? 1 : len === 2 ? 0.9 : 0.8);
+  const markAction = () => setLastActionAt(Date.now());
 
   /* ---------- ANIMATIONS ---------- */
   const glow = useRef(new Animated.Value(0.6)).current;
@@ -54,7 +58,6 @@ export default function BlackjackScreen() {
 
   const barPulse = useRef(new Animated.Value(0)).current;
 
-  // Met à jour le texte affiché quand creditAnim bouge
   useEffect(() => {
     const id = creditAnim.addListener(({ value }) => {
       setDisplayCredits(Math.round(value));
@@ -64,13 +67,11 @@ export default function BlackjackScreen() {
     };
   }, []);
 
-  // Si credits change “sans animation” (ex: on place une mise), on sync le compteur direct
   useEffect(() => {
-    if (isCreditAnimating.current) return; // ⚠️ ne pas casser l’anim en cours
+    if (isCreditAnimating.current) return;
     creditAnim.setValue(credits);
   }, [credits]);
 
-  // Lance l’animation complète (compteur + pastille + pulse)
   const animateCreditChange = (delta: number, toValue: number) => {
     if (delta === 0) return;
 
@@ -157,6 +158,42 @@ export default function BlackjackScreen() {
       : `${totals[0]}`;
   }
 
+  /* ---------- TIMER ---------- */
+  const TURN_DURATION = 15000; // 15s
+
+  const currentHand = playerHands[currentHandIndex] ?? [];
+  const isPlayerActive =
+    gameStarted &&
+    playerTurn &&
+    currentHand.length > 0 &&
+    !isBlackjack(currentHand) &&
+    bestValue(currentHand) < 21;
+
+  // Mets le timer en pause sur modales / phases bloquantes
+  const paused = showRules || insuranceOffered;
+
+  // À l’expiration : on passe le tour (équivaut à "Rester")
+  const handleExpire = () => {
+    if (!playerTurn) return;
+    stand();
+  };
+
+  const { mmss, progress } = useTurnTimer({
+    isActive: isPlayerActive,
+    durationMs: TURN_DURATION,
+    paused,
+    onExpire: handleExpire,
+    resetKey: [currentHandIndex, lastActionAt],
+  });
+
+  useEffect(() => {
+    // Quand la manche commence / qu'on repasse au joueur / ou qu'on change de main → reset du timer
+    if (gameStarted && playerTurn) {
+      markAction();
+    }
+  }, [gameStarted, playerTurn, currentHandIndex]);
+  /* ---------- FIN TIMER ---------- */
+
   /* ---------- GAME FLOW ---------- */
   const initGame = () => {
     if (bets[0] === 0) {
@@ -216,6 +253,9 @@ export default function BlackjackScreen() {
       setGameStarted(true);
       setPlayerTurn(!playerBJ);
       setMessage('');
+
+      markAction();
+      
       // Assurance si le croupier montre un As
       if (dealerUpIsAce) {
         setTimeout(() => setInsuranceOffered(true), 2000);};
@@ -262,6 +302,7 @@ export default function BlackjackScreen() {
     });
 
     setDeck(newDeck);
+    markAction();
   };
 
   const stand = () => {
@@ -270,6 +311,7 @@ export default function BlackjackScreen() {
     } else {
       setPlayerTurn(false);
     }
+    markAction();
   };
 
   const doubleDown = () => {
@@ -284,6 +326,7 @@ export default function BlackjackScreen() {
     setTimeout(() => {
       setPlayerTurn(false);
     }, 1000); 
+    markAction();
   };
 
   const splitHand = () => {
@@ -347,10 +390,8 @@ export default function BlackjackScreen() {
     setPlayerHands(newHands);
     setDeck(newDeck);
 
-    // On reste sur la première main
     setCurrentHandIndex(currentHandIndex);
-
-    // On va doubler la mise et vérifier les crédit plus tard
+    markAction();
   };
 
   const takeInsurance = () => {
@@ -548,6 +589,14 @@ export default function BlackjackScreen() {
             <Feather name="info" style={styles.infoBtn} size={24} />
           </TouchableOpacity>
         </View>
+
+        {/* ANNEAU TIMER — centré en haut, entre Menu et Info */}
+        <TurnTimerRing
+          visible={isPlayerActive}
+          mmss={mmss}
+          progress={progress}
+          style={{ position: "absolute", top: 40, alignSelf: "center" }}
+        />
 
         {/* Dans BlackjackScreen.tsx */}
         <RulesModal visible={showRules} onClose={() => setShowRules(false)} />
