@@ -1,64 +1,29 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
+import { 
+  View, 
+  Text, 
+  TextInput, 
+  TouchableOpacity, 
+  StyleSheet, 
+  Alert, 
+  ActivityIndicator, 
+  KeyboardAvoidingView, 
+  Platform,
+} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { supabase } from '../supabase/supabaseClient';
-import * as Linking from 'expo-linking'; // Import important pour la redirection
+import { supabase } from '../supabase/supabaseClient'; // Vérifie le chemin
+import * as Linking from 'expo-linking';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
 
   // Création automatique de l'URL de redirection correcte
-  // Sur Expo Go, ça ressemblera à exp://192.168.x.x:8081
-  // En prod, ça sera joackpot://
   const redirectUrl = Linking.createURL('/');
 
   useEffect(() => {
-    console.log("🔗 URL de redirection à ajouter dans Supabase :", redirectUrl);
+    console.log("🔗 URL de redirection (LoginScreen) :", redirectUrl);
   }, [redirectUrl]);
-
-  // Gestion de la création du joueur après connexion
-  useEffect(() => {
-    const checkUserAndCreateProfile = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (user) {
-        // Vérifie si le profil joueur existe déjà
-        const { data: player, error } = await supabase
-          .from('players')
-          .select('*')
-          .eq('id', user.id)
-          .single();
-
-        if (!player && !error) {
-          // Création du profil initial
-          const { error: insertError } = await supabase.from('players').insert({
-            id: user.id,
-            email: user.email,
-            credits: 1000,
-            last_login: new Date().toISOString(),
-          });
-          
-          if (insertError) console.error("Erreur création profil:", insertError);
-        } else if (player) {
-          await supabase
-            .from('players')
-            .update({ last_login: new Date().toISOString() })
-            .eq('id', user.id);
-        }
-      }
-    };
-
-    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_IN') {
-        checkUserAndCreateProfile();
-      }
-    });
-
-    return () => {
-      authListener.subscription.unsubscribe();
-    };
-  }, []);
 
   const handleLogin = async () => {
     if (!email.trim()) {
@@ -125,7 +90,7 @@ export default function LoginScreen() {
             {loading ? (
               <ActivityIndicator color="#000" />
             ) : (
-              <Text style={styles.buttonText}>Recevoir mon lien magique</Text>
+              <Text style={styles.buttonText}>Recevoir mon lien magique ✨</Text>
             )}
           </TouchableOpacity>
           
