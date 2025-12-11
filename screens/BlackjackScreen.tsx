@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, ImageBackground, Animated, Easing, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, Animated, Easing, Alert } from 'react-native';
 import { Card as CardType } from '../types/Card';
 import Hand from '../components/Hand';
 import { generateDeck } from '../utils/generateDeck';
@@ -12,7 +12,9 @@ import GameResultPopup from '../components/GameResultPopup';
 import TurnTimerRing from "../components/TurnTimerRing";
 import { useTurnTimer } from "../hooks/useTurnTimer";
 
-const INITIAL_CREDITS = 1000;
+// --- IMPORTS SUPABASE ---
+import { supabase } from '../supabase/supabaseClient';
+import { useAuth } from '../supabase/AuthContext';
 
 /* ---------- TYPES & HELPERS POUR LES SIDE BETS ---------- */
 
@@ -31,7 +33,7 @@ const getCardPokerValue = (value: string): number => {
     case 'Valet': return 11;
     case 'Dame': return 12;
     case 'Roi': return 13;
-    case 'As': return 14; // As fort pour les suites hautes
+    case 'As': return 14; 
     default: return 0;
   }
 };
@@ -46,7 +48,6 @@ const checkThreeCardPokerHand = (h1: CardType, h2: CardType, d1: CardType): { ty
   const isTrips = values[0] === values[1] && values[1] === values[2];
   
   // Check Straight (Suite)
-  // Cas spécial: As-2-3 (14, 2, 3) -> on le traite comme 1, 2, 3 pour la suite
   let isStraight = (values[0] + 1 === values[1] && values[1] + 1 === values[2]);
   if (!isStraight && values[2] === 14 && values[0] === 2 && values[1] === 3) {
     isStraight = true; // A-2-3
@@ -66,28 +67,23 @@ const checkPlayerPairBonus = (h1: CardType, h2: CardType): { type: string, multi
   const v1 = getCardPokerValue(h1.value);
   const v2 = getCardPokerValue(h2.value);
   
-  // Check Double Dame de Cœur (Jackpot)
   if (v1 === 12 && v2 === 12 && h1.suit === 'Coeur' && h2.suit === 'Coeur') {
     return { type: "Double Dame de Cœur 👑", multiplier: 100 };
   }
 
   const isPair = v1 === v2;
   const isSuited = h1.suit === h2.suit;
-
-  // Couleurs (Rouge: Coeur/Carreau, Noir: Pique/Trefle)
   const isRed1 = ['Coeur', 'Carreau'].includes(h1.suit);
   const isRed2 = ['Coeur', 'Carreau'].includes(h2.suit);
   const isSameColor = (isRed1 && isRed2) || (!isRed1 && !isRed2);
 
   if (isPair) {
-    if (isSuited) return { type: "Paire Parfaite", multiplier: 50 }; // Suited Pair
-    if (isSameColor) return { type: "Paire Couleur", multiplier: 15 }; // Colored Pair
-    return { type: "Paire Mixte", multiplier: 7 }; // Mixed Pair
+    if (isSuited) return { type: "Paire Parfaite", multiplier: 50 }; 
+    if (isSameColor) return { type: "Paire Couleur", multiplier: 15 }; 
+    return { type: "Paire Mixte", multiplier: 7 }; 
   }
 
-  // Check Total 20 (non paire) : ex Roi + Valet, 10 + Dame, etc.
-  // Attention: pour le blackjack, Valet/Dame/Roi valent 10.
-  const bjValue1 = v1 > 10 && v1 < 14 ? 10 : (v1 === 14 ? 11 : v1); // On compte l'As comme 11 pour le 20
+  const bjValue1 = v1 > 10 && v1 < 14 ? 10 : (v1 === 14 ? 11 : v1); 
   const bjValue2 = v2 > 10 && v2 < 14 ? 10 : (v2 === 14 ? 11 : v2);
   
   if (bjValue1 + bjValue2 === 20) {
@@ -99,23 +95,37 @@ const checkPlayerPairBonus = (h1: CardType, h2: CardType): { type: string, multi
 
 
 export default function BlackjackScreen() {
+  /* ---------- SUPABASE & AUTH ---------- */
+  const { user } = useAuth();
+  
+  // Fonction pour sauvegarder les crédits dans Supabase
+  const saveCreditsToSupabase = async (newAmount: number) => {
+    if (!user) return;
+    const { error } = await supabase
+      .from('players')
+      .update({ credits: newAmount })
+      .eq('id', user.id);
+      
+    if (error) console.error("Erreur sauvegarde crédits:", error);
+  };
+
   /* ---------- STATE ---------- */
   const [deck, setDeck] = useState<CardType[]>([]);
   const [playerHands, setPlayerHands] = useState<CardType[][]>([[]]);
   const [currentHandIndex, setCurrentHandIndex] = useState(0);
   const [dealerHand, setDealerHand] = useState<CardType[]>([]);
   
-  const [credits, setCredits] = useState<number>(INITIAL_CREDITS);
+  // On commence à 0, le useEffect va charger la vraie valeur
+  const [credits, setCredits] = useState<number>(0);
   
   // Mises : bets[0] = Main Bet. 
   const [bets, setBets] = useState<number[]>([0]);
-  // Side Bets state
   const [sideBets, setSideBets] = useState<{ poker: number, ladies: number }>({ poker: 0, ladies: 0 });
-  const [sideBetResults, setSideBetResults] = useState<string[]>([]); // Pour afficher les gains au début
+  const [sideBetResults, setSideBetResults] = useState<string[]>([]); 
 
   const [gameStarted, setGameStarted] = useState<boolean>(false);
   const [playerTurn, setPlayerTurn] = useState<boolean>(true);
-  const [message, setMessage] = useState<string>('Place tes mises');
+  const [message, setMessage] = useState<string>('Chargement...');
   
   const [insuranceOffered, setInsuranceOffered] = useState<boolean>(false);
   const [insuranceBet, setInsuranceBet] = useState<number>(0);
@@ -132,8 +142,8 @@ export default function BlackjackScreen() {
   const [popupColor, setPopupColor] = useState('#fff');
 
   // Animation crédits 
-  const creditAnim = useRef(new Animated.Value(credits)).current;
-  const [displayCredits, setDisplayCredits] = useState(credits); 
+  const creditAnim = useRef(new Animated.Value(0)).current;
+  const [displayCredits, setDisplayCredits] = useState(0); 
   const [gainToShow, setGainToShow] = useState(0);
 
   /* ---------- ANIMATIONS UTILS ---------- */
@@ -168,6 +178,29 @@ export default function BlackjackScreen() {
   const handScale = (len: number) => (len === 1 ? 1 : len === 2 ? 0.9 : 0.8);
   const markAction = () => setLastActionAt(Date.now());
 
+  /* ---------- CHARGEMENT CREDITS (INIT) ---------- */
+  useEffect(() => {
+    if (user) {
+      const fetchCredits = async () => {
+        const { data, error } = await supabase
+          .from('players')
+          .select('credits')
+          .eq('id', user.id)
+          .single();
+        
+        if (data) {
+          setCredits(data.credits);
+          creditAnim.setValue(data.credits); // Sync animation instantanément
+          setMessage('Place tes mises');
+        } else if (error) {
+          console.error("Erreur fetch credits:", error);
+          setMessage('Erreur chargement crédits');
+        }
+      };
+      fetchCredits();
+    }
+  }, [user]);
+
   /* ---------- CREDIT ANIMATION ---------- */
   useEffect(() => {
     const id = creditAnim.addListener(({ value }) => {
@@ -176,6 +209,7 @@ export default function BlackjackScreen() {
     return () => { creditAnim.removeListener(id); };
   }, []);
 
+  // Sync animation when state changes (sauf si animation en cours gérée manuellement)
   useEffect(() => {
     if (isCreditAnimating.current) return;
     creditAnim.setValue(credits);
@@ -245,7 +279,6 @@ export default function BlackjackScreen() {
   }, [playerHands.length]);
 
   /* ---------- BETTING LOGIC ---------- */
-  // On stocke le type de mise activement sélectionné pour ajouter des jetons
   const [selectedBetTarget, setSelectedBetTarget] = useState<'main' | 'poker' | 'ladies'>('main');
 
   const addBet = (amount: number) => {
@@ -280,10 +313,12 @@ export default function BlackjackScreen() {
       return;
     }
 
-    setSideBetResults([]); // Reset visual feedback
+    // SAUVEGARDE DB : On valide que l'argent misé est bien débité sur le serveur
+    saveCreditsToSupabase(credits);
+
+    setSideBetResults([]); 
 
     let newDeck = generateDeck(); // 6 decks
-    // Draw 3 initial cards
     const [p1, deck1] = drawCard(newDeck);
     const [d1, deck2] = drawCard(deck1);
     const [p2, deck3] = drawCard(deck2);
@@ -296,11 +331,9 @@ export default function BlackjackScreen() {
     setDealerHand(initialDealerHand);
     setDeck(deck3);
 
-    // Flips
     setPlayerFlipped([[false, false]]);
     setDealerFlipped([false]);
 
-    // Animation séquentielle
     setTimeout(() => setPlayerFlipped([[true, false]]), 500);
     setTimeout(() => setDealerFlipped([true]), 1000);
     
@@ -316,7 +349,7 @@ export default function BlackjackScreen() {
       if (sideBets.poker > 0) {
         const pokerRes = checkThreeCardPokerHand(p1, p2, d1);
         if (pokerRes.multiplier > 0) {
-          const win = sideBets.poker * (pokerRes.multiplier + 1); // +1 car on rend la mise
+          const win = sideBets.poker * (pokerRes.multiplier + 1); 
           bonusWinnings += win;
           resultsText.push(`21+3: ${pokerRes.type} (+${win}€)`);
         } else {
@@ -338,27 +371,50 @@ export default function BlackjackScreen() {
 
       // Paiement immédiat des bonus
       if (bonusWinnings > 0) {
-        animateCreditChange(bonusWinnings, credits + bonusWinnings);
-        setCredits(c => c + bonusWinnings);
-        // Reset des mises bonus car traitées
+        const newTotal = credits + bonusWinnings;
+        animateCreditChange(bonusWinnings, newTotal);
+        setCredits(newTotal);
+        // SAUVEGARDE DB : On sauve les gains bonus
+        saveCreditsToSupabase(newTotal);
+        
         setSideBets({ poker: 0, ladies: 0 }); 
       }
       
       if (resultsText.length > 0) {
-        // Affichage temporaire des résultats bonus
         setSideBetResults(resultsText);
         setTimeout(() => setSideBetResults([]), 4000);
       }
 
     }, 1500);
 
-    // Suite logique du jeu
     setTimeout(() => {
       const playerBJ = isBlackjack([p1, p2]);
       const dealerUpIsAce = dealerShowsAce(d1);
 
       if (playerBJ && !dealerUpIsAce) {
-        setCredits(c => c + bets[0] * 2.5);
+        const winAmount = bets[0] * 2.5;
+        const newTotal = credits + winAmount; // Note: 'credits' ici n'inclut PAS bonusWinnings car closure, attention
+        // ASTUCE: Pour éviter les problèmes de closure avec les setTimeout imbriqués, 
+        // on refera le calcul des crédits finaux proprement dans une fonction dédiée ou via setCredits(fn)
+        // Mais ici, pour le blackjack immédiat, c'est OK car les bonus sont déjà traités.
+        // ATTENTION: si bonusWinnings > 0, 'credits' local variable est encore l'ancien.
+        // Le plus sûr est d'utiliser la valeur fonctionnelle, mais pour saveToSupabase on a besoin de la valeur.
+        // SIMPLIFICATION: On re-fetch ou on trust la logique séquentielle.
+        // Pour ce code, on va utiliser setCredits(c => ...) et on calculera le total théorique pour la DB.
+        
+        // CORRECTION ROBUSTE : On va calculer le delta final.
+        // Si blackjack : on gagne mise * 2.5.
+        // Si bonus gagnés avant : ils sont déjà dans 'credits' state (via le render précédent ?) 
+        // Non, dans un setTimeout, le state 'credits' est celui de la création du callback.
+        // Solution : Utiliser une ref pour les crédits ou enchainer les actions.
+        
+        // Pour simplifier dans ce contexte : On va relire le state via un setState fonctionnel qui trigger la save
+        setCredits(prev => {
+          const final = prev + bets[0] * 2.5;
+          saveCreditsToSupabase(final); // On sauve le total final
+          return final;
+        });
+
         setBets([0]);
         setGameStarted(false);
         setPlayerTurn(false);
@@ -387,7 +443,6 @@ export default function BlackjackScreen() {
       const updatedCurrentHand = [...updatedHands[currentHandIndex], card];
       updatedHands[currentHandIndex] = updatedCurrentHand;
 
-      // Anim
       setPlayerFlipped(prev => {
         const next = [...prev];
         next[currentHandIndex] = [...(next[currentHandIndex] || []), false];
@@ -428,12 +483,20 @@ export default function BlackjackScreen() {
 
   const doubleDown = () => {
     if (!playerTurn || credits < bets[currentHandIndex] || playerHands.length > 1) return;
-    setCredits(c => c - bets[currentHandIndex]);
+    
+    const betAmount = bets[currentHandIndex];
+    
+    // MAJ Credits & Save
+    const newCredits = credits - betAmount;
+    setCredits(newCredits);
+    saveCreditsToSupabase(newCredits);
+    
     setBets(arr => {
       const newArr = [...arr];
       newArr[currentHandIndex] *= 2;
       return newArr;
     });
+    
     hit();
     setTimeout(() => setPlayerTurn(false), 1000);
     markAction();
@@ -444,28 +507,26 @@ export default function BlackjackScreen() {
     const newBet = oldBets[currentHandIndex];
     if (credits < newBet) { setMessage('Crédits insuffisants'); return; }
 
+    // MAJ Credits & Save
+    const newCredits = credits - newBet;
+    setCredits(newCredits);
+    saveCreditsToSupabase(newCredits);
+
     const hands = [...playerHands];
     const handToSplit = hands[currentHandIndex];
     
-    // Split logic
     const newHand1 = [handToSplit[0]];
     const newHand2 = [handToSplit[1]];
     
     const newHands = [...hands.slice(0, currentHandIndex), newHand1, newHand2, ...hands.slice(currentHandIndex + 1)];
     const newBets = [...oldBets.slice(0, currentHandIndex), newBet, newBet, ...oldBets.slice(currentHandIndex + 1)];
     
-    // Flips logic update
     const oldFlips = playerFlipped[currentHandIndex];
     const newFlipped = [...playerFlipped.slice(0, currentHandIndex), [oldFlips[0], false], [oldFlips[1], false], ...playerFlipped.slice(currentHandIndex + 1)];
 
     setPlayerHands(newHands);
     setBets(newBets);
-    setCredits(c => c - newBet);
     setPlayerFlipped(newFlipped);
-    
-    // Deal 2 new cards for split hands logic not fully implemented here for brevity, usually we just hit immediately or wait for next action
-    // But standard is: separate them, and let user play hand 1.
-    // NOTE: In this simplified version, we just split. The user will have to HIT to get 2nd card on each hand.
     
     markAction();
   };
@@ -479,7 +540,6 @@ export default function BlackjackScreen() {
       let dDeck = [...deck];
       let dFlipped = [...dealerFlipped];
 
-      // Reveal hidden card if exists (usually dealing starts with 1 up, here we simulate 2nd card draw for dealer)
       if (dHand.length === 1) {
         const [second, rest] = drawCard(dDeck);
         dHand.push(second);
@@ -550,8 +610,15 @@ export default function BlackjackScreen() {
       setInsuranceBet(0);
     }
 
-    animateCreditChange(gain, credits + gain);
-    setCredits(c => c + gain);
+    // MISE À JOUR FINALE DES CRÉDITS
+    // On utilise setCredits avec callback pour avoir la valeur la plus fraîche (même si dealerPlay a duré)
+    setCredits(prevCredits => {
+       const finalCredits = prevCredits + gain;
+       animateCreditChange(gain, finalCredits);
+       saveCreditsToSupabase(finalCredits); // Sauvegarde DB
+       return finalCredits;
+    });
+
     setGameStarted(false);
     setBets([0]);
     
@@ -562,7 +629,12 @@ export default function BlackjackScreen() {
 
   const takeInsurance = () => {
     const maxIns = bets[0] / 2;
-    if (credits >= maxIns) { setCredits(c => c - maxIns); setInsuranceBet(maxIns); }
+    if (credits >= maxIns) { 
+       const newCredits = credits - maxIns;
+       setCredits(newCredits); 
+       saveCreditsToSupabase(newCredits);
+       setInsuranceBet(maxIns); 
+    }
     setInsuranceOffered(false);
   };
   const declineInsurance = () => setInsuranceOffered(false);
