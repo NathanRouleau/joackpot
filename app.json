@@ -1,6 +1,7 @@
 {
   "expo": {
     "name": "JOAckpot",
+    "scheme": "joackpot",
     "slug": "joackpot-app",
     "version": "1.0.0",
     "orientation": "portrait",
